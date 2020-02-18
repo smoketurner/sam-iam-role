@@ -1,0 +1,7 @@
+AmazonECSTaskExecutionRolePolicy
+AmazonEKSWorkerNodePolicy
+AWSLambdaBasicExecutionRole
+AWSLambdaENIManagementAccess
+AWSLambdaVPCAccessExecutionRole
+AWSXRayDaemonWriteAccess
+AWSXrayWriteOnlyAccess

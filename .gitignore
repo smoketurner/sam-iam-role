@@ -1,0 +1,6 @@
+.aws-sam
+.venv
+node_modules
+coverage
+packaged.yml
+samconfig.toml

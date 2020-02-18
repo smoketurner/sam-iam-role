@@ -1,0 +1,199 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: >
+  AWS SAM project to deploy an IAM role creation service API
+
+Metadata:
+  'AWS::ServerlessRepo::Application':
+    Name: iam-role-service
+    Description: >
+      AWS SAM project to deploy an IAM role creation service API
+      Includes: API Gateway, Lambda
+    Author: smoketurner
+    SpdxLicenseId: MIT
+    LicenseUrl: LICENSE
+    ReadmeUrl: README.md
+    Labels: ['organization', 'org', 'apigateway', 'apigw', 'lambda', 'iam', 'account', 'sqs']
+    HomePageUrl: https://github.com/smoketurner/sam-iam-role
+    SemanticVersion: 1.0.0
+    SourceCodeUrl: https://github.com/smoketurner/sam-iam-role
+
+Parameters:
+  ExecutionRoleName:
+    Type: String
+    Default: RoleCreationExecution
+    Description: Name of the IAM role in the target account
+
+Globals:
+  Function:
+    Handler: handler.lambda_handler
+    Runtime: python3.8
+    MemorySize: 128 # megabytes
+    Timeout: 3 # seconds
+
+Resources:
+  RoleCreationAdminRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: RoleCreationAdminRole
+      Description: !Sub 'DO NOT DELETE - Used by Role Creation Service. Created by CloudFormation ${AWS::StackId}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Principal:
+              Service: 'lambda.amazonaws.com'
+            Effect: Allow
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: RoleCreationAssumePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: 'sts:AssumeRole'
+                Resource: !Sub 'arn:${AWS::Partition}:iam::*:role/${ExecutionRoleName}'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
+
+  CreateRoleLambdaFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      CodeUri: src/handlers/create_role/
+      Description: Create new IAM role Lambda handler
+      Role: !GetAtt RoleCreationAdminRole.Arn
+    Environment:
+      Variables:
+        EXECUTION_ROLE_NAME: !Ref ExecutionRoleName
+
+  EvaluatePolicyLambdaFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      CodeUri: src/handlers/evaluate_policy/
+      Description: Evaluate IAM policy Lambda handler
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - 'iam:GetContextKeysForPrincipalPolicy'
+                - 'iam:SimulatePrincipalPolicy'
+              Resource: '*'
+
+  VerifyRoleLambdaFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      CodeUri: src/handlers/verify_role/
+      Description: Verify IAM role Lambda handler
+      Role: !GetAtt RoleCreationAdminRole.Arn
+    Environment:
+      Variables:
+        EXECUTION_ROLE_NAME: !Ref ExecutionRoleName
+
+  StatesExecutionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Principal:
+              Service:
+                - 'events.amazonaws.com'
+                - 'lambda.amazonaws.com'
+                - 'states.amazonaws.com'
+            Effect: Allow
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: 'StatesExecutionPolicy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'lambda:InvokeFunction'
+                  - 'states:StartExecution'
+                Resource: '*'
+
+  StateMachine:
+    Type: 'AWS::StepFunctions::StateMachine'
+    Properties:
+      DefinitionString: !Sub |-
+        {
+          "Comment": "Role Creation Process",
+          "StartAt": "IsValidRequestType",
+          "States": {
+            "IsValidRequestType": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Or": [
+                    {
+                      "Variable": "$.type",
+                      "StringEquals": "iam"
+                    },
+                    {
+                      "Variable": "$.type",
+                      "StringEquals": "sns_topic"
+                    },
+                    {
+                      "Variable": "$.type",
+                      "StringEquals": "s3_bucket"
+                    },
+                    {
+                      "Variable": "$.type",
+                      "StringEquals": "vpce"
+                    }
+                  ],
+                  "Next": "EvaluatePolicy"
+                }
+              ],
+              "Default": "InvalidType"
+            },
+            "EvaluatePolicy": {
+              "Type": "Task",
+              "Resource": "${EvaluatePolicyLambdaFunction.Arn}",
+              "TimeoutSeconds": 60,
+              "Next": "IsCompliant"
+            },
+            "InvalidType": {
+              "Type": "Fail"
+            },
+            "IsCompliant": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.result",
+                  "StringEquals": "COMPLIANT",
+                  "Next": "CreateRoles"
+                }
+              ],
+              "Default": "NonCompliant"
+            },
+            "CreateRoles": {
+              "Type": "Task",
+              "Resource": "${CreateRoleLambdaFunction.Arn}",
+              "Next": "VerifyRoles",
+              "TimeoutSeconds": 60
+            },
+            "VerifyRoles": {
+              "Type": "Task",
+              "Resource": "${VerifyRoleLambdaFunction.Arn}",
+              "Retry": [
+                {
+                  "ErrorEquals": ["RetryError"],
+                  "IntervalSeconds": 10,
+                  "BackoffRate": 1.0,
+                  "MaxAttempts": 500
+                }
+              ],
+              "TimeoutSeconds": 60,
+              "Next": "RolesCreated"
+            },
+            "NonCompliant": {
+              "Type": "Fail"
+            },
+            "RolesCreated": {
+              "Type": "Succeed"
+            }
+          }
+        }
+      RoleArn: !GetAtt StatesExecutionRole.Arn

@@ -1,0 +1,5 @@
+{
+    "editor.formatOnSave": true,
+    "python.pythonPath": "/Users/jplock/envs/git/sam-iam-role/.venv/bin/python3",
+    "python.formatting.provider": "black"
+}
