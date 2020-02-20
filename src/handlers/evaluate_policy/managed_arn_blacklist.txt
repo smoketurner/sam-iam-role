@@ -164,6 +164,6 @@ ServiceQuotasFullAccess
 SimpleWorkflowFullAccess
 TranslateFullAccess
 WellArchitectedConsoleFullAccess
-AmazonPersonalizeFullAccess
+service-role/AmazonPersonalizeFullAccess
 ReadOnly
 ViewOnly

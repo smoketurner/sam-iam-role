@@ -36,6 +36,6 @@ def lambda_handler(event, _):
             f"Unable to assume role '{EXECUTION_ROLE_NAME}' in account {account_id}"
         )
 
-    iam_client = boto3.client("iam")
+    cloudformation_client = boto3.client("cloudformation")
 
-    response = iam_client.create_role()
+    response = cloudformation_client.create_stack()

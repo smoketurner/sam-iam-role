@@ -10,3 +10,9 @@
         resource: mybucketname
     managed_policy_arns:
       - AmazonEKSWorkerNodePolicy
+
+- name: PingLambdaRole
+  settings:
+    principal_service: lambda
+    managed_policy_arns:
+      - AWSLambdaBasicExecutionRole

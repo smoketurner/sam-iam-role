@@ -1,0 +1,7 @@
+API s3:PutObject was denied because the API is approved but not for the following resources requested:
+["arn:aws:s3:::myunapprovedbucket"]
+
+API kms:Decrypt was denied because the API is approved but not for the following resources requested:
+["arn:aws:kms:us-east-1:12345566:key/key-id"]
+
+Correct the resource restriction or contact the Cloud Enablement team for assistance.

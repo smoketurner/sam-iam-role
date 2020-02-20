@@ -1,6 +1,7 @@
 .aws-sam
 .venv
-node_modules
+__pycache__
+*.pyc
 coverage
 packaged.yml
 samconfig.toml

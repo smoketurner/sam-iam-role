@@ -1,3 +1,0 @@
-{
-  "roles": "---\n- name: Ec2Role\n settings:\n    principal_service: ec2\n    policies:\n      - default_role_policies\n    additional_policies:\n      - action:\n          - 's3:GetObject'\n        resource: mybucketname\n    managed_policy_arns:\n      - AmazonEKSWorkerNodePolicy"
-}
