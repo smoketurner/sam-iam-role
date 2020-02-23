@@ -12,6 +12,9 @@ def json_dump_slim(obj):
 
 
 class TestRole(unittest.TestCase):
+    def setUp(self):
+        self.maxDiff = None
+
     def test_empty_role_load(self):
         role = Role("")
         actual = role.analyze()
@@ -114,7 +117,7 @@ class TestRole(unittest.TestCase):
         data = {
             "name": "Ec2Role",
             "settings": {
-                "principal_service": "ec2",
+                "principal_service": "bad",
                 "policies": ["default_role_policy"],
             },
         }
@@ -125,7 +128,7 @@ class TestRole(unittest.TestCase):
         self.assertEqual(len(role.findings), 2)
         self.assertEqual(
             str(role.findings[0]),
-            "UNKNOWN_POLICY - Role contains an unknown default principal policy - {'string': 'ec2', 'filepath': None}",
+            "UNKNOWN_POLICY - Role contains an unknown default principal policy - {'string': 'bad', 'filepath': None}",
         )
         self.assertEqual(
             str(role.findings[1]),
@@ -180,9 +183,7 @@ class TestRole(unittest.TestCase):
             "RESOURCE_MISMATCH - [{'action': 's3:GetObject', 'required_format': 'arn:*:s3:::*/*'}] - {'actions': ['s3:GetObject'], 'filepath': None}",
         )
 
-    def test_role_to_json(self):
-        self.maxDiff = None
-
+    def test_ecs_role_to_json(self):
         data = {
             "name": "EcsRole",
             "settings": {
@@ -192,7 +193,9 @@ class TestRole(unittest.TestCase):
         }
 
         role = Role(data)
-        role.analyze()
+        self.assertTrue(role.analyze())
+        self.assertEqual(len(role.findings), 0)
+
         actual = role.to_json()
 
         expected = {
@@ -240,6 +243,166 @@ class TestRole(unittest.TestCase):
                     }
                 ],
                 "RoleName": "EcsRole",
+            },
+            "Type": "AWS::IAM::Role",
+        }
+
+        self.assertEqual(actual, json_dump_slim(expected))
+
+    def test_ec2_role_to_json(self):
+        data = {
+            "name": "Ec2Role",
+            "settings": {
+                "principal_service": "ec2",
+                "policies": ["default_role_policy"],
+                "additional_policies": [
+                    {
+                        "action": ["s3:GetObject"],
+                        "resource": "arn:aws:s3:::mybucketname/*",
+                    }
+                ],
+                "managed_policy_arns": ["AmazonEKSWorkerNodePolicy"],
+            },
+        }
+
+        role = Role(data)
+        self.assertTrue(role.analyze())
+        self.assertEqual(len(role.findings), 0)
+
+        actual = role.to_json()
+
+        expected = {
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": "sts:AssumeRole",
+                            "Effect": "Allow",
+                            "Principal": {"Service": ["ec2.amazonaws.com"]},
+                        }
+                    ],
+                    "Version": "2012-10-17",
+                },
+                "Description": "DO NOT DELETE - Created by Role Creation Service. Created by CloudFormation ${AWS::StackId}",
+                "Policies": [
+                    {
+                        "PolicyName": "default_ec2_policy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Sid": "CloudWatchAccess",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "logs:CreateLogGroup",
+                                        "logs:CreateLogStream",
+                                        "logs:PutLogEvents",
+                                    ],
+                                    "Resource": "*",
+                                },
+                            ],
+                        },
+                    },
+                    {
+                        "PolicyName": "inline_policy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": ["s3:GetObject"],
+                                    "Resource": "arn:aws:s3:::mybucketname/*",
+                                },
+                            ],
+                        },
+                    },
+                ],
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+                ],
+                "RoleName": "Ec2Role",
+            },
+            "Type": "AWS::IAM::Role",
+        }
+
+        self.assertEqual(actual, json_dump_slim(expected))
+
+    def test_multiple_principals(self):
+        data = {
+            "name": "Ec2Role",
+            "settings": {
+                "principal_service": "ec2",
+                "principal_aws": "123456789012",
+                "policies": ["default_role_policy"],
+                "additional_policies": [
+                    {
+                        "action": ["s3:GetObject"],
+                        "resource": "arn:aws:s3:::mybucketname/*",
+                    }
+                ],
+                "managed_policy_arns": ["AmazonEKSWorkerNodePolicy"],
+            },
+        }
+
+        role = Role(data)
+        self.assertTrue(role.analyze())
+        self.assertEqual(len(role.findings), 0)
+
+        actual = role.to_json()
+
+        expected = {
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": "sts:AssumeRole",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": "123456789012",
+                                "Service": ["ec2.amazonaws.com"],
+                            },
+                        }
+                    ],
+                    "Version": "2012-10-17",
+                },
+                "Description": "DO NOT DELETE - Created by Role Creation Service. Created by CloudFormation ${AWS::StackId}",
+                "Policies": [
+                    {
+                        "PolicyName": "default_ec2_policy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Sid": "CloudWatchAccess",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "logs:CreateLogGroup",
+                                        "logs:CreateLogStream",
+                                        "logs:PutLogEvents",
+                                    ],
+                                    "Resource": "*",
+                                },
+                            ],
+                        },
+                    },
+                    {
+                        "PolicyName": "inline_policy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": ["s3:GetObject"],
+                                    "Resource": "arn:aws:s3:::mybucketname/*",
+                                },
+                            ],
+                        },
+                    },
+                ],
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+                ],
+                "RoleName": "Ec2Role",
             },
             "Type": "AWS::IAM::Role",
         }

@@ -4,39 +4,42 @@
 import unittest
 
 from handler import lambda_handler
-from evaluate_policy.exceptions import InvalidRoleException
 
 
 class HandlerTest(unittest.TestCase):
-    def test_handler_no_roles(self):
+    def setUp(self):
+        self.maxDiff = None
+
+    def test_empty_event(self):
         event = ""
 
         with self.assertRaises(Exception) as cm:
             lambda_handler(event, None)
 
         actual = str(cm.exception)
-        self.assertEqual(actual, "No roles found")
+        self.assertEqual(actual, "Invalid event")
 
-    def test_handler_invalid_yaml(self):
-        event = '""hi'
+    def test_no_roles(self):
+        event = {"roles": ""}
 
-        with self.assertRaises(InvalidRoleException) as cm:
+        with self.assertRaises(Exception) as cm:
             lambda_handler(event, None)
 
-        actual = cm.exception
-        self.assertEqual(actual, None)
+        actual = str(cm.exception)
+        self.assertEqual(actual, "No roles found in request")
 
-    def test_handler_load_json(self):
-        event = '{"key":"value"}'
+    def test_invalid_yaml(self):
+        event = {"roles": "{test"}
 
-        with self.assertRaises(InvalidRoleException) as cm:
+        with self.assertRaises(Exception) as cm:
             lambda_handler(event, None)
 
-        actual = cm.exception
-        self.assertEqual(actual.errors, None)
+        actual = str(cm.exception)
+        self.assertEqual(actual, "YAML parsing error")
 
     def test_handler(self):
-        event = """
+        event = {
+            "roles": """
 ---
 - name: Ec2Role
   settings:
@@ -50,6 +53,7 @@ class HandlerTest(unittest.TestCase):
     managed_policy_arns:
       - AmazonEKSWorkerNodePolicy
 """
+        }
 
         actual = lambda_handler(event, None)
 

@@ -4,7 +4,6 @@
 import os
 import json
 import logging
-import pkg_resources
 
 from parliament import analyze_policy_string
 from parliament.finding import Finding
@@ -12,7 +11,7 @@ from parliament.finding import Finding
 from .utils import load_file_to_set, load_file_to_dict
 
 LOGGER = logging.getLogger(__name__)
-LOGGER.setLevel(logging.DEBUG)
+LOGGER.setLevel(logging.INFO)
 
 MANAGED_ARN_WHITELIST = load_file_to_set("managed_arn_whitelist.txt")
 LOGGER.info(f"Loaded {len(MANAGED_ARN_WHITELIST)} managed policy ARNs from whitelist")
@@ -33,13 +32,13 @@ class Role:
         self.managed_policy_arns = []
         self.filepath = filepath
 
-    def add_finding(self, finding, detail="", location={}):
+    def add_finding(self, finding, detail="", location={}) -> None:
         if "filepath" not in location:
             location["filepath"] = self.filepath
         self._findings.append(Finding(finding, detail, location))
 
     @property
-    def findings(self):
+    def findings(self) -> list:
         all_findings = []
         all_findings.extend(self._findings)
 
@@ -53,13 +52,13 @@ class Role:
         return all_findings
 
     @property
-    def is_valid(self):
+    def is_valid(self) -> bool:
         for policy in self.analyzed_policies:
             if not policy.is_valid:
                 return False
         return True
 
-    def analyze(self):
+    def analyze(self) -> bool:
         """
         Returns False if this role is so broken that it couldn't be analyzed further.
         On True, it may still have findings.
@@ -90,6 +89,7 @@ class Role:
                 "principal_service",
                 "principal_aws",
                 "principal_federated",
+                "principal_canonical_user",
                 "additional_policies",
                 "policies",
                 "managed_policy_arns",
@@ -105,6 +105,7 @@ class Role:
             "principal_service" not in settings
             and "principal_aws" not in settings
             and "principal_federated" not in settings
+            and "principal_canonical_user" not in settings
         ):
             self.add_finding("MALFORMED", detail="Role contains no principal")
 
@@ -151,8 +152,13 @@ class Role:
 
         for policy in self.policies:
             policy_doc = json.dumps(policy["PolicyDocument"])
-            analyzed_policy = analyze_policy_string(policy_doc)
-            self.analyzed_policies.append(analyzed_policy)
+            try:
+                analyzed_policy = analyze_policy_string(policy_doc)
+                self.analyzed_policies.append(analyzed_policy)
+            except Exception as exc:
+                self.add_finding(
+                    "MALFORMED", detail=str(exc), location={"policy": policy_doc}
+                )
 
         for policy_name in settings.get("managed_policy_arns", []):
             if policy_name not in MANAGED_ARN_WHITELIST:
@@ -189,7 +195,10 @@ class Role:
 
         if "principal_aws" in settings:
             assume_statement["Principal"]["AWS"] = settings["principal_aws"]
-
+        if "principal_canonical_user" in settings:
+            assume_statement["Principal"]["CanonicalUser"] = settings[
+                "principal_canonical_user"
+            ]
         if "principal_federated" in settings:
             assume_statement["Principal"]["Federated"] = settings["principal_federated"]
 
@@ -209,7 +218,10 @@ class Role:
         if self.policies:
             role["Properties"]["Policies"] = self.policies
         if self.managed_policy_arns:
-            role["Properties"]["ManagedPolicyArns"] = self.managed_policy_arns
+            role["Properties"]["ManagedPolicyArns"] = [
+                f"arn:aws:iam::aws:policy/{policy}"
+                for policy in self.managed_policy_arns
+            ]
 
         if whitespace:
             params = {"indent": 2, "sort_keys": True, "separators": (", ", ": ")}
@@ -218,5 +230,5 @@ class Role:
 
         return json.dumps(role, **params)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.to_json()
