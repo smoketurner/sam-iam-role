@@ -1,24 +1,32 @@
 {
-  "PolicyName": "default_role_policies",
+  "PolicyName": "default_lambda_policy",
   "PolicyDocument": {
     "Version": "2012-10-17",
     "Statement": [
       {
-        "Sid": "CloudWatchAccess",
-        "Effect": "Allow",
-        "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
-        "Resource": "arn:aws:logs:*:*:log-group:*"
-      },
-      {
         "Sid": "LambdaVPCAccess",
         "Effect": "Allow",
-        "Action": ["ec2:CreateNetworkInterface", "ec2:DescribeNetworkInterfaces", "ec2:DeleteNetworkInterface"],
+        "Action": [
+          "ec2:CreateNetworkInterface",
+          "ec2:DescribeNetworkInterfaces",
+          "ec2:DeleteNetworkInterface"
+        ],
+        "Resource": "*"
+      },
+      {
+        "Sid": "CloudWatchAccess",
+        "Effect": "Allow",
+        "Action": [
+          "logs:CreateLogGroup",
+          "logs:PutLogEvents",
+          "logs:CreateLogStream"
+        ],
         "Resource": "*"
       },
       {
         "Sid": "XRayWriteAccess",
         "Effect": "Allow",
-        "Actions": [
+        "Action": [
           "xray:PutTraceSegments",
           "xray:PutTelemetryRecords",
           "xray:GetSamplingRules",

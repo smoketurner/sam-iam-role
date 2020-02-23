@@ -1,2 +1,2 @@
-parliament==0.4.6
+parliament==0.4.8
 PyYAML==5.3

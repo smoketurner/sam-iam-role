@@ -1,48 +1,46 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import os
 import json
 import logging
 
-from parliament import analyze_policy_string
 import yaml
 
-from evaluate_policy.role import Role, InvalidRoleException
-from evaluate_policy.utils import load_file_to_string
+from evaluate_policy.role import Role
+from evaluate_policy.exceptions import InvalidRoleException
+from evaluate_policy.utils import load_file_to_string, load_file_to_set
 
 
 LOGGER = logging.getLogger(__name__)
-LOGGER.setLevel(logging.DEBUG)
+LOGGER.setLevel(logging.INFO)
 
 
 def lambda_handler(event, _):
-    LOGGER.info(f"event: {event}")
+    LOGGER.debug(f"event: {event}")
 
-    roles = load_file_to_string("sample_roles.yml")
-
-    try:
-        roles = yaml.safe_load(roles)
-    except yaml.ParserError:
-        raise Exception("Unable to parse YAML roles")
-
-    LOGGER.debug(f"roles: {roles}")
-
+    roles = event.get("roles")
     if not roles:
         raise Exception("No roles found in request")
 
-    for role in roles:
-        try:
-            role_obj = Role.load(role)
-        except InvalidRoleException as ex:
-            for error in ex.errors:
-                LOGGER.error(error)
-            LOGGER.error(
-                "Correct the resource restriction or contact the Cloud Enablement team for assistance."
-            )
+    try:
+        roles = yaml.safe_load(roles)
+    except yaml.YAMLError as ex:
+        raise Exception(f"YAML parsing error: {ex}")
 
-        for policy in role_obj.policies:
-            policy_doc = json.dumps(policy)
+    print(f"roles: {roles}")
 
-            analyzed_policy = analyze_policy_string(policy_doc)
-            for finding in analyzed_policy.findings:
-                LOGGER.warn(f"finding: {finding}")
+    if not isinstance(roles, list):
+        raise Exception("No roles found found in request")
+
+    findings = []
+
+    for role_dict in roles:
+        role = Role(role_dict)
+        findings.extend(role.findings)
+
+    if findings:
+        LOGGER.error(
+            "Correct the resource restriction or contact the Cloud Enablement team for assistance."
+        )
+

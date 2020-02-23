@@ -1,7 +1,9 @@
 setup:
 	python3 -m venv .venv
-	source .venv/bin/activate.csh
-	pip3 install -r requirements.txt
+	.venv/bin/pip3 install -r requirements.txt
+	.venv/bin/pip3 install -r src/handlers/create_role/requirements.txt
+	.venv/bin/pip3 install -r src/handlers/evaluate_policy/requirements.txt
+	.venv/bin/pip3 install -r src/handlers/verify_role/requirements.txt
 
 build:
 	sam build -u
@@ -13,10 +15,11 @@ format:
 	black .
 
 test:
-	python3 -m unittest discover -s src/handlers
+	bash run_tests.sh
 
 invoke:
-	sam local invoke "EvaluatePolicyLambdaFunction"
+	./generate_event.js
+	sam local invoke "EvaluatePolicyLambdaFunction" -e event.json
 
 list-policies:
 	aws iam list-policies --profile jplock --output text | awk '{print $2}' | grep FullAccess | sort
