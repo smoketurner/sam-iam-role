@@ -5,7 +5,7 @@ Description: >
 
 Metadata:
   'AWS::ServerlessRepo::Application':
-    Name: iam-role-service
+    Name: role-creation-service
     Description: >
       AWS SAM project to deploy an IAM role creation service API
       Includes: API Gateway, Lambda
@@ -30,6 +30,9 @@ Globals:
     Runtime: python3.8
     MemorySize: 128 # megabytes
     Timeout: 3 # seconds
+    Environment:
+      Variables:
+        EXECUTION_ROLE_NAME: !Ref ExecutionRoleName
 
 Resources:
   RoleCreationAdminRole:
@@ -45,7 +48,7 @@ Resources:
             Effect: Allow
             Action: 'sts:AssumeRole'
       Policies:
-        - PolicyName: RoleCreationAssumePolicy
+        - PolicyName: RoleCreationAdminPolicy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -53,7 +56,7 @@ Resources:
                 Action: 'sts:AssumeRole'
                 Resource: !Sub 'arn:${AWS::Partition}:iam::*:role/${ExecutionRoleName}'
       ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
 
   CreateRoleLambdaFunction:
     Type: 'AWS::Serverless::Function'
@@ -61,23 +64,13 @@ Resources:
       CodeUri: src/handlers/create_role/
       Description: Create new IAM role Lambda handler
       Role: !GetAtt RoleCreationAdminRole.Arn
-    Environment:
-      Variables:
-        EXECUTION_ROLE_NAME: !Ref ExecutionRoleName
 
   EvaluatePolicyLambdaFunction:
     Type: 'AWS::Serverless::Function'
     Properties:
       CodeUri: src/handlers/evaluate_policy/
       Description: Evaluate IAM policy Lambda handler
-      Policies:
-        - Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Action:
-                - 'iam:GetContextKeysForPrincipalPolicy'
-                - 'iam:SimulatePrincipalPolicy'
-              Resource: '*'
+      Role: !GetAtt RoleCreationAdminRole.Arn
 
   VerifyRoleLambdaFunction:
     Type: 'AWS::Serverless::Function'
@@ -85,9 +78,6 @@ Resources:
       CodeUri: src/handlers/verify_role/
       Description: Verify IAM role Lambda handler
       Role: !GetAtt RoleCreationAdminRole.Arn
-    Environment:
-      Variables:
-        EXECUTION_ROLE_NAME: !Ref ExecutionRoleName
 
   StatesExecutionRole:
     Type: 'AWS::IAM::Role'

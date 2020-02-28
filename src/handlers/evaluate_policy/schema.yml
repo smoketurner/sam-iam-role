@@ -1,0 +1,22 @@
+list(include('role'), min=1)
+---
+role:
+  name: regex('^[a-z0-9_+=,.@]{,50}$', ignore_case=True)
+  settings: include('settings')
+
+settings:
+  principal_service: include('str_or_list', required=False)
+  principal_aws: include('str_or_list', required=False)
+  principal_federated: include('str_or_list', required=False)
+  principal_canonical_user: include('str_or_list', required=False)
+  policies: include('str_or_list', required=False)
+  additional_policies: list(include('policy'), required=False)
+  managed_policy_arns: include('str_or_list', required=False)
+
+policy:
+  effect: str(required=False)
+  action: include('str_or_list')
+  resource: include('str_or_list')
+  condition: map(required=False)
+
+str_or_list: any(str(exclude=' '), list(str(exclude=' '), min=1))

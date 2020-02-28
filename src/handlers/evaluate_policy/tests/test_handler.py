@@ -11,33 +11,27 @@ class HandlerTest(unittest.TestCase):
         self.maxDiff = None
 
     def test_empty_event(self):
-        event = ""
-
-        with self.assertRaises(Exception) as cm:
-            lambda_handler(event, None)
-
-        actual = str(cm.exception)
-        self.assertEqual(actual, "Invalid event")
+        actual = lambda_handler("")
+        expected = {"result": "NON_COMPLIANT"}
+        self.assertEqual(actual, expected)
 
     def test_no_roles(self):
         event = {"roles": ""}
 
-        with self.assertRaises(Exception) as cm:
-            lambda_handler(event, None)
+        actual = lambda_handler(event)
+        expected = {"result": "NON_COMPLIANT"}
 
-        actual = str(cm.exception)
-        self.assertEqual(actual, "No roles found in request")
+        self.assertEqual(actual, expected)
 
     def test_invalid_yaml(self):
         event = {"roles": "{test"}
 
-        with self.assertRaises(Exception) as cm:
-            lambda_handler(event, None)
+        actual = lambda_handler(event)
+        expected = {"result": "NON_COMPLIANT"}
 
-        actual = str(cm.exception)
-        self.assertEqual(actual, "YAML parsing error")
+        self.assertEqual(actual, expected)
 
-    def test_handler(self):
+    def test_valid_yaml(self):
         event = {
             "roles": """
 ---
@@ -47,14 +41,30 @@ class HandlerTest(unittest.TestCase):
     policies:
       - default_role_policies
     additional_policies:
-      - action:
-          - 's3:GetObject'
-        resource: mybucketname
+      - action: 's3:GetObject'
+        resource: 'arn:aws:s3:::mybucketname/*'
     managed_policy_arns:
       - AmazonEKSWorkerNodePolicy
 """
         }
 
-        actual = lambda_handler(event, None)
+        actual = lambda_handler(event)
+        expected = {"result": "COMPLIANT"}
 
-        self.assertEqual(actual, None)
+        self.assertEqual(actual, expected)
+
+    def test_invalid_name(self):
+        event = {
+            "roles": """
+---
+- name: bad name!!!
+  settings:
+    principal_service: ec2
+    policies: default_role_policies
+"""
+        }
+
+        actual = lambda_handler(event)
+        expected = {"result": "NON_COMPLIANT"}
+
+        self.assertEqual(actual, expected)

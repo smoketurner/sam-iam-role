@@ -1,410 +1,249 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import json
 import unittest
 
+from parliament.finding import Finding
+
 from evaluate_policy.role import Role
-
-
-def json_dump_slim(obj):
-    return json.dumps(obj, sort_keys=True, indent=None, separators=(",", ":"))
 
 
 class TestRole(unittest.TestCase):
     def setUp(self):
         self.maxDiff = None
 
-    def test_empty_role_load(self):
-        role = Role("")
-        actual = role.analyze()
-        self.assertFalse(actual)
-        self.assertEqual(len(role.findings), 1)
-        self.assertEqual(
-            str(role.findings[0]),
-            "MALFORMED - Role contains no settings - {'filepath': None}",
-        )
-
-    def test_unknown_element(self):
-        data = {"key": "value"}
+    def test_principal_service_multiple(self):
+        data = {"settings": {"principal_service": ["ec2", "lambda"]}}
 
         role = Role(data)
-        actual = role.analyze()
-        self.assertFalse(actual)
-        self.assertEqual(len(role.findings), 1)
-        self.assertEqual(
-            str(role.findings[0]),
-            "MALFORMED - Role contains an unknown element - {'string': 'key', 'filepath': None}",
-        )
+        actual = role.principal_service
+        expected = ["ec2", "lambda"]
+        self.assertEqual(actual, expected)
 
-    def test_missing_settings(self):
-        data = {"name": "Ec2Role"}
+    def test_principal_service_single(self):
+        data = {"settings": {"principal_service": "ec2"}}
 
         role = Role(data)
-        actual = role.analyze()
-        self.assertFalse(actual)
-        self.assertEqual(len(role.findings), 1)
-        self.assertEqual(
-            str(role.findings[0]),
-            "MALFORMED - Role contains no settings - {'filepath': None}",
-        )
+        actual = role.principal_service
+        expected = ["ec2"]
+        self.assertEqual(actual, expected)
 
-    def test_settings_unknown_element(self):
-        data = {"name": "Ec2Role", "settings": {"key": "value"}}
+    def test_principal_service_none(self):
+        data = {"settings": {}}
 
         role = Role(data)
-        actual = role.analyze()
-        self.assertFalse(actual)
-        self.assertEqual(len(role.findings), 1)
-        self.assertEqual(
-            str(role.findings[0]),
-            "MALFORMED - Role settings contains an unknown element - {'string': 'key', 'filepath': None}",
-        )
+        actual = role.principal_service
+        expected = []
+        self.assertEqual(actual, expected)
 
-    def test_missing_policies(self):
-        data = {"name": "Ec2Role", "settings": {"principal_service": "ec2"}}
+    def test_update_statements(self):
+        statements = [
+            {
+                "Effect": "Allow",
+                "Action": "kms:Decrypt",
+                "Resource": "arn:${AWS::Partition}:kms:${AWS::Region}:${AWS::AccountId}:key/my-key",
+            }
+        ]
 
-        role = Role(data)
-        actual = role.analyze()
-        self.assertTrue(actual)
-        self.assertEqual(len(role.findings), 1)
-        self.assertEqual(
-            str(role.findings[0]),
-            "MALFORMED - Role contains no policies - {'filepath': None}",
-        )
+        role = Role({}, region="us-east-1", account_id="111222333", partition="aws")
+        actual = role._update_statements(statements)
+        expected = [
+            {
+                "Effect": "Allow",
+                "Action": "kms:Decrypt",
+                "Resource": ["arn:aws:kms:us-east-1:111222333:key/my-key"],
+            }
+        ]
 
-    def test_blacklisted_managed_policy(self):
-        data = {
-            "name": "Ec2Role",
-            "settings": {
-                "principal_service": "ec2",
-                "managed_policy_arns": ["AdministratorAccess"],
-            },
-        }
+        self.assertEqual(actual, expected)
 
-        role = Role(data)
-        actual = role.analyze()
-        self.assertTrue(actual)
-        self.assertEqual(len(role.findings), 2)
-        self.assertEqual(
-            str(role.findings[0]),
-            "UNAPPROVED_POLICY - Managed policy is not approved for use - {'string': 'AdministratorAccess', 'filepath': None}",
-        )
-        self.assertEqual(
-            str(role.findings[1]),
-            "MALFORMED - Role contains no policies - {'filepath': None}",
-        )
+    def test_update_statements_cf(self):
+        statements = [
+            {
+                "Effect": "Allow",
+                "Action": "kms:Decrypt",
+                "Resource": "arn:${AWS::Partition}:kms:${AWS::Region}:${AWS::AccountId}:key/my-key",
+            }
+        ]
 
-    def test_unknown_prefix_policy(self):
-        data = {
-            "name": "Ec2Role",
-            "settings": {
-                "principal_service": "ec2",
-                "additional_policies": [{"action": ["bad:*"], "resource": "*"}],
-            },
-        }
-
-        role = Role(data)
-        actual = role.analyze()
-        self.assertTrue(actual)
-        self.assertEqual(len(role.findings), 1)
-        self.assertEqual(
-            str(role.findings[0]),
-            "UNKNOWN_PREFIX - Unknown prefix bad - {'statement': {'Effect': 'Allow', 'Action': ['bad:*'], 'Resource': '*'}, 'filepath': None}",
-        )
-
-    def test_unknown_default_service_policy(self):
-        data = {
-            "name": "Ec2Role",
-            "settings": {
-                "principal_service": "bad",
-                "policies": ["default_role_policy"],
-            },
-        }
-
-        role = Role(data)
-        actual = role.analyze()
-        self.assertTrue(actual)
-        self.assertEqual(len(role.findings), 2)
-        self.assertEqual(
-            str(role.findings[0]),
-            "UNKNOWN_POLICY - Role contains an unknown default principal policy - {'string': 'bad', 'filepath': None}",
-        )
-        self.assertEqual(
-            str(role.findings[1]),
-            "MALFORMED - Role contains no policies - {'filepath': None}",
-        )
-
-    def test_lambda_default_service_policy(self):
-        data = {
-            "name": "LambdaRole",
-            "settings": {
-                "principal_service": "lambda",
-                "policies": ["default_role_policy"],
-            },
-        }
-
-        role = Role(data)
-        actual = role.analyze()
-        self.assertTrue(actual)
-        self.assertEqual(len(role.findings), 0)
-
-    def test_ecs_default_service_policy(self):
-        data = {
-            "name": "EcsRole",
-            "settings": {
-                "principal_service": "ecs",
-                "policies": ["default_role_policy"],
-            },
-        }
-
-        role = Role(data)
-        actual = role.analyze()
-        self.assertTrue(actual)
-        self.assertEqual(len(role.findings), 0)
-
-    def test_invalid_policy(self):
-        data = {
-            "name": "EcsRole",
-            "settings": {
-                "principal_service": "ecs",
-                "additional_policies": [
-                    {"action": "s3:GetObject", "resource": "arn:aws:logs:*:*:*"}
-                ],
-            },
-        }
-
-        role = Role(data)
-        actual = role.analyze()
-        self.assertTrue(actual)
-        self.assertEqual(len(role.findings), 1)
-        self.assertEqual(
-            str(role.findings[0]),
-            "RESOURCE_MISMATCH - [{'action': 's3:GetObject', 'required_format': 'arn:*:s3:::*/*'}] - {'actions': ['s3:GetObject'], 'filepath': None}",
-        )
-
-    def test_ecs_role_to_json(self):
-        data = {
-            "name": "EcsRole",
-            "settings": {
-                "principal_service": "ecs",
-                "policies": ["default_role_policy"],
-            },
-        }
-
-        role = Role(data)
-        self.assertTrue(role.analyze())
-        self.assertEqual(len(role.findings), 0)
-
-        actual = role.to_json()
-
-        expected = {
-            "Properties": {
-                "AssumeRolePolicyDocument": {
-                    "Statement": [
-                        {
-                            "Action": "sts:AssumeRole",
-                            "Effect": "Allow",
-                            "Principal": {"Service": ["ecs.amazonaws.com"]},
-                        }
-                    ],
-                    "Version": "2012-10-17",
-                },
-                "Description": "DO NOT DELETE - Created by Role Creation Service. Created by CloudFormation ${AWS::StackId}",
-                "Policies": [
+        role = Role({}, region="us-east-1", account_id="111222333", partition="aws")
+        actual = role._update_statements(statements, cf_sub_func=True)
+        expected = [
+            {
+                "Effect": "Allow",
+                "Action": "kms:Decrypt",
+                "Resource": [
                     {
-                        "PolicyName": "default_ecs_policy",
-                        "PolicyDocument": {
-                            "Version": "2012-10-17",
-                            "Statement": [
-                                {
-                                    "Sid": "ContainerRegistryAccess",
-                                    "Effect": "Allow",
-                                    "Action": [
-                                        "ecr:GetAuthorizationToken",
-                                        "ecr:BatchCheckLayerAvailability",
-                                        "ecr:GetDownloadUrlForLayer",
-                                        "ecr:BatchGetImage",
-                                    ],
-                                    "Resource": "*",
-                                },
-                                {
-                                    "Sid": "CloudWatchAccess",
-                                    "Effect": "Allow",
-                                    "Action": [
-                                        "logs:CreateLogGroup",
-                                        "logs:CreateLogStream",
-                                        "logs:PutLogEvents",
-                                    ],
-                                    "Resource": "*",
-                                },
-                            ],
-                        },
+                        "Fn::Sub": "arn:${AWS::Partition}:kms:${AWS::Region}:${AWS::AccountId}:key/my-key"
                     }
                 ],
-                "RoleName": "EcsRole",
-            },
-            "Type": "AWS::IAM::Role",
-        }
+            }
+        ]
 
-        self.assertEqual(actual, json_dump_slim(expected))
+        self.assertEqual(actual, expected)
 
-    def test_ec2_role_to_json(self):
+    def test_update_statements_cf(self):
+        statements = [
+            {
+                "Effect": "Allow",
+                "Action": "kms:Decrypt",
+                "Resource": "arn:aws:kms:us-east-1:111222333:key/my-key",
+            }
+        ]
+
+        role = Role({})
+        actual = role._update_statements(statements, cf_sub_func=True)
+        expected = [
+            {
+                "Effect": "Allow",
+                "Action": "kms:Decrypt",
+                "Resource": ["arn:aws:kms:us-east-1:111222333:key/my-key"],
+            }
+        ]
+
+        self.assertEqual(actual, expected)
+
+    def test_get_default_policies(self):
+        data = {"settings": {"principal_service": "lambda"}}
+        role = Role(data, region="us-east-1", account_id="111222333")
+
+        actual = role.get_default_policies()
+        expected = [
+            {
+                "PolicyName": "default_lambda_policy",
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "ENI",
+                            "Effect": "Allow",
+                            "Action": [
+                                "ec2:CreateNetworkInterface",
+                                "ec2:DescribeNetworkInterfaces",
+                                "ec2:DeleteNetworkInterface",
+                            ],
+                            "Resource": ["*"],
+                        },
+                        {
+                            "Sid": "CloudWatchLogGroup",
+                            "Effect": "Allow",
+                            "Action": "logs:CreateLogGroup",
+                            "Resource": ["*"],
+                        },
+                        {
+                            "Sid": "CloudWatchLogStream",
+                            "Effect": "Allow",
+                            "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+                            "Resource": [
+                                "arn:aws:logs:us-east-1:111222333:log-group:*:log-stream:/aws/lambda/*"
+                            ],
+                        },
+                        {
+                            "Sid": "XRay",
+                            "Effect": "Allow",
+                            "Action": [
+                                "xray:PutTraceSegments",
+                                "xray:PutTelemetryRecords",
+                                "xray:GetSamplingRules",
+                                "xray:GetSamplingTargets",
+                                "xray:GetSamplingStatisticSummaries",
+                            ],
+                            "Resource": ["*"],
+                        },
+                        {
+                            "Sid": "KMS",
+                            "Effect": "Allow",
+                            "Action": [
+                                "kms:Encrypt",
+                                "kms:Decrypt",
+                                "kms:ReEncrypt*",
+                                "kms:GenerateDataKey*",
+                                "kms:DescribeKey",
+                            ],
+                            "Resource": [
+                                "arn:aws:kms:us-east-1:111222333:key/AccountKey"
+                            ],
+                        },
+                    ],
+                },
+            }
+        ]
+
+        self.assertEqual(actual, expected)
+
+    def test_get_policies(self):
         data = {
-            "name": "Ec2Role",
             "settings": {
-                "principal_service": "ec2",
-                "policies": ["default_role_policy"],
                 "additional_policies": [
                     {
-                        "action": ["s3:GetObject"],
+                        "action": "s3:GetObject",
                         "resource": "arn:aws:s3:::mybucketname/*",
                     }
-                ],
-                "managed_policy_arns": ["AmazonEKSWorkerNodePolicy"],
-            },
+                ]
+            }
         }
+        role = Role(data, region="us-east-1", account_id="111222333")
 
-        role = Role(data)
-        self.assertTrue(role.analyze())
-        self.assertEqual(len(role.findings), 0)
-
-        actual = role.to_json()
-
-        expected = {
-            "Properties": {
-                "AssumeRolePolicyDocument": {
+        actual = role.get_policies()
+        expected = [
+            {
+                "PolicyName": "inline_policy",
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
                     "Statement": [
                         {
-                            "Action": "sts:AssumeRole",
+                            "Action": "s3:GetObject",
                             "Effect": "Allow",
-                            "Principal": {"Service": ["ec2.amazonaws.com"]},
+                            "Resource": ["arn:aws:s3:::mybucketname/*"],
                         }
                     ],
-                    "Version": "2012-10-17",
                 },
-                "Description": "DO NOT DELETE - Created by Role Creation Service. Created by CloudFormation ${AWS::StackId}",
-                "Policies": [
-                    {
-                        "PolicyName": "default_ec2_policy",
-                        "PolicyDocument": {
-                            "Version": "2012-10-17",
-                            "Statement": [
-                                {
-                                    "Sid": "CloudWatchAccess",
-                                    "Effect": "Allow",
-                                    "Action": [
-                                        "logs:CreateLogGroup",
-                                        "logs:CreateLogStream",
-                                        "logs:PutLogEvents",
-                                    ],
-                                    "Resource": "*",
-                                },
-                            ],
-                        },
-                    },
-                    {
-                        "PolicyName": "inline_policy",
-                        "PolicyDocument": {
-                            "Version": "2012-10-17",
-                            "Statement": [
-                                {
-                                    "Effect": "Allow",
-                                    "Action": ["s3:GetObject"],
-                                    "Resource": "arn:aws:s3:::mybucketname/*",
-                                },
-                            ],
-                        },
-                    },
-                ],
-                "ManagedPolicyArns": [
-                    "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
-                ],
-                "RoleName": "Ec2Role",
-            },
-            "Type": "AWS::IAM::Role",
-        }
+            }
+        ]
 
-        self.assertEqual(actual, json_dump_slim(expected))
+        self.assertEqual(actual, expected)
 
-    def test_multiple_principals(self):
+    def test_analyze_policies(self):
         data = {
-            "name": "Ec2Role",
             "settings": {
-                "principal_service": "ec2",
-                "principal_aws": "123456789012",
+                "principal_service": ["ec2", "ec2", "lambda"],
                 "policies": ["default_role_policy"],
                 "additional_policies": [
-                    {
-                        "action": ["s3:GetObject"],
-                        "resource": "arn:aws:s3:::mybucketname/*",
-                    }
+                    {"action": "s3:GetObject", "resource": "arn:aws:s3:::mybucketname"}
                 ],
-                "managed_policy_arns": ["AmazonEKSWorkerNodePolicy"],
-            },
+            }
         }
-
         role = Role(data)
-        self.assertTrue(role.analyze())
-        self.assertEqual(len(role.findings), 0)
 
-        actual = role.to_json()
+        actual = [str(finding) for finding in role.analyze_policies()]
 
-        expected = {
-            "Properties": {
-                "AssumeRolePolicyDocument": {
-                    "Statement": [
-                        {
-                            "Action": "sts:AssumeRole",
-                            "Effect": "Allow",
-                            "Principal": {
-                                "AWS": "123456789012",
-                                "Service": ["ec2.amazonaws.com"],
-                            },
-                        }
-                    ],
-                    "Version": "2012-10-17",
-                },
-                "Description": "DO NOT DELETE - Created by Role Creation Service. Created by CloudFormation ${AWS::StackId}",
-                "Policies": [
-                    {
-                        "PolicyName": "default_ec2_policy",
-                        "PolicyDocument": {
-                            "Version": "2012-10-17",
-                            "Statement": [
-                                {
-                                    "Sid": "CloudWatchAccess",
-                                    "Effect": "Allow",
-                                    "Action": [
-                                        "logs:CreateLogGroup",
-                                        "logs:CreateLogStream",
-                                        "logs:PutLogEvents",
-                                    ],
-                                    "Resource": "*",
-                                },
-                            ],
-                        },
-                    },
-                    {
-                        "PolicyName": "inline_policy",
-                        "PolicyDocument": {
-                            "Version": "2012-10-17",
-                            "Statement": [
-                                {
-                                    "Effect": "Allow",
-                                    "Action": ["s3:GetObject"],
-                                    "Resource": "arn:aws:s3:::mybucketname/*",
-                                },
-                            ],
-                        },
-                    },
-                ],
-                "ManagedPolicyArns": [
-                    "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
-                ],
-                "RoleName": "Ec2Role",
-            },
-            "Type": "AWS::IAM::Role",
-        }
+        expected = [
+            "RESOURCE_MISMATCH"
+            " - [{'action': 's3:GetObject', 'required_format': 'arn:*:s3:::*/*'}]"
+            " - {'actions': ['s3:GetObject'], 'filepath': None}"
+        ]
 
-        self.assertEqual(actual, json_dump_slim(expected))
+        self.assertEqual(actual, expected)
+
+    def test_valid_managed_policy(self):
+        data = {"settings": {"managed_policy_arns": ["AmazonEKSWorkerNodePolicy"]}}
+        role = Role(data)
+
+        actual = role.analyze_policies()
+        expected = []
+
+        self.assertEqual(actual, expected)
+
+    def test_invalid_managed_policy(self):
+        data = {"settings": {"managed_policy_arns": ["AdministratorAccess"]}}
+        role = Role(data)
+
+        actual = [str(finding) for finding in role.analyze_policies()]
+
+        expected = [
+            "DENIED_POLICIES"
+            " - Managed policies are not approved for use"
+            " - {'managed_policy_arns': ['AdministratorAccess']}"
+        ]
+
+        self.assertEqual(actual, expected)

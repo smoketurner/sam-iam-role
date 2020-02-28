@@ -6,21 +6,25 @@ import os
 
 import boto3
 
+from create_role.cloudformation import CloudFormation
+
 EXECUTION_ROLE_NAME = os.environ["EXECUTION_ROLE_NAME"]
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.INFO)
 
 
-def assume_role(account_id):
-    options = {
-        "RoleArn": f"arn:aws:iam::{account_id}:role/{EXECUTION_ROLE_NAME}",
-        "RoleSessionName": "rcs-role-create",
-    }
+def assume_cross_account_role(account_id, session_name):
+    role_arn = f"arn:aws:iam::{account_id}:role/{EXECUTION_ROLE_NAME}"
 
-    sts_client = boto3.client("sts")
-    response = sts_client.assume_role(**options)
-    return response["Credentials"]
+    client = boto3.client("sts")
+    response = client.assume_role(RoleArn=role_arn, RoleSessionName=session_name)
+    LOGGER.debug(f"Role '{EXECUTION_ROLE_NAME}' has bee assumed for {account_id}")
+    return boto3.Session(
+        aws_access_key_id=response["Credentials"]["AccessKeyId"],
+        aws_secret_access_key=response["Credentials"]["SecretAccessKey"],
+        aws_session_token=response["Credentials"]["SessionToken"],
+    )
 
 
 def lambda_handler(event, _):
@@ -30,12 +34,25 @@ def lambda_handler(event, _):
     if not account_id:
         raise Exception("AccountId not found in request")
 
-    credentials = assume_role(account_id)
-    if not credentials:
-        raise Exception(
-            f"Unable to assume role '{EXECUTION_ROLE_NAME}' in account {account_id}"
-        )
+    region = event.get("Region")
+    if not region:
+        raise Exception("Region not found in request")
 
-    cloudformation_client = boto3.client("cloudformation")
+    stack_name = event.get("StackName")
+    if not region:
+        raise Exception("StackName not found in request")
 
-    response = cloudformation_client.create_stack()
+    template_body = event.get("TemplateBody")
+    if not template_body:
+        raise Exception("TemplateBody not found in request")
+
+    role = assume_cross_account_role(account_id, "rcs-role-create")
+
+    cloudformation = CloudFormation(
+        region,
+        role,
+        template_body=template_body,
+        stack_name=stack_name,
+        account_id=account_id,
+    )
+    cloudformation.create_stack()

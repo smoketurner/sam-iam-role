@@ -4,7 +4,7 @@
     "Version": "2012-10-17",
     "Statement": [
       {
-        "Sid": "ContainerRegistryAccess",
+        "Sid": "ECR",
         "Effect": "Allow",
         "Action": [
           "ecr:GetAuthorizationToken",
@@ -15,14 +15,31 @@
         "Resource": "*"
       },
       {
-        "Sid": "CloudWatchAccess",
+        "Sid": "CloudWatchLogGroup",
+        "Effect": "Allow",
+        "Action": "logs:CreateLogGroup",
+        "Resource": "*"
+      },
+      {
+        "Sid": "CloudWatchLogStream",
         "Effect": "Allow",
         "Action": [
-          "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents"
         ],
-        "Resource": "*"
+        "Resource": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:*:log-stream:/aws/ecs/*"
+      },
+      {
+        "Sid": "KMS",
+        "Effect": "Allow",
+        "Action": [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey"
+        ],
+        "Resource": "arn:${AWS::Partition}:kms:${AWS::Region}:${AWS::AccountId}:key/AccountKey"
       }
     ]
   }

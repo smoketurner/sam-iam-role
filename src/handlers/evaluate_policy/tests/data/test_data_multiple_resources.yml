@@ -1,0 +1,12 @@
+---
+- name: Ec2Role
+  settings:
+    principal_service: ec2
+    policies:
+      - default_role_policies
+    additional_policies:
+      - action: 's3:GetObject'
+        resource:
+          - mybucketname
+          - otherbucket
+    managed_policy_arns: AmazonEKSWorkerNodePolicy
