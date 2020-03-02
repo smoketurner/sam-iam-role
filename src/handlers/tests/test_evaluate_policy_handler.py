@@ -3,7 +3,7 @@
 
 import unittest
 
-from handler import lambda_handler
+from evaluate_policy import lambda_handler
 
 
 class HandlerTest(unittest.TestCase):

@@ -1,16 +1,15 @@
 {
-  "PolicyName": "default_ecs_policy",
+  "PolicyName": "default_lambda_policy",
   "PolicyDocument": {
     "Version": "2012-10-17",
     "Statement": [
       {
-        "Sid": "ECR",
+        "Sid": "ENI",
         "Effect": "Allow",
         "Action": [
-          "ecr:GetAuthorizationToken",
-          "ecr:BatchCheckLayerAvailability",
-          "ecr:GetDownloadUrlForLayer",
-          "ecr:BatchGetImage"
+          "ec2:CreateNetworkInterface",
+          "ec2:DescribeNetworkInterfaces",
+          "ec2:DeleteNetworkInterface"
         ],
         "Resource": "*"
       },
@@ -27,7 +26,19 @@
           "logs:CreateLogStream",
           "logs:PutLogEvents"
         ],
-        "Resource": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:*:log-stream:/aws/ecs/*"
+        "Resource": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*:log-stream:*"
+      },
+      {
+        "Sid": "XRay",
+        "Effect": "Allow",
+        "Action": [
+          "xray:PutTraceSegments",
+          "xray:PutTelemetryRecords",
+          "xray:GetSamplingRules",
+          "xray:GetSamplingTargets",
+          "xray:GetSamplingStatisticSummaries"
+        ],
+        "Resource": "*"
       },
       {
         "Sid": "KMS",

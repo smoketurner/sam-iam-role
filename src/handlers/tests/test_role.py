@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import os
 import unittest
 
 from parliament.finding import Finding
 
-from evaluate_policy.role import Role
+from role_creation_service.role import Role
 
 
 class TestRole(unittest.TestCase):
@@ -92,7 +93,7 @@ class TestRole(unittest.TestCase):
         ]
 
         role = Role({})
-        actual = role._update_statements(statements, cf_sub_func=True)
+        actual = role._update_statements(statements, is_cf=True)
         expected = [
             {
                 "Effect": "Allow",
@@ -135,7 +136,7 @@ class TestRole(unittest.TestCase):
                             "Effect": "Allow",
                             "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
                             "Resource": [
-                                "arn:aws:logs:us-east-1:111222333:log-group:*:log-stream:/aws/lambda/*"
+                                "arn:aws:logs:us-east-1:111222333:log-group:/aws/lambda/*:log-stream:*"
                             ],
                         },
                         {
@@ -168,6 +169,36 @@ class TestRole(unittest.TestCase):
                 },
             }
         ]
+
+        self.assertEqual(actual, expected)
+
+    def test_get_inline_policy(self):
+        data = {
+            "settings": {
+                "additional_policies": [
+                    {
+                        "action": "s3:GetObject",
+                        "resource": "arn:aws:s3:::mybucketname/*",
+                    }
+                ]
+            }
+        }
+        role = Role(data, region="us-east-1", account_id="111222333")
+
+        actual = role.get_inline_policy()
+        expected = {
+            "PolicyName": "inline_policy",
+            "PolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Action": "s3:GetObject",
+                        "Effect": "Allow",
+                        "Resource": ["arn:aws:s3:::mybucketname/*"],
+                    }
+                ],
+            },
+        }
 
         self.assertEqual(actual, expected)
 

@@ -6,8 +6,9 @@ const roles = fs.readFileSync("./sample_roles.yml", "utf8");
 
 const event = {
   type: "iam",
-  account_id: "1234567",
-  stack_name: "EksCluster",
+  account_id: "194184563732",
+  region: "us-east-1",
+  stack_name: "PlaydateRoles",
   roles
 };
 

@@ -1,0 +1,17 @@
+---
+- name: HandlerLambdaRole
+  settings:
+    principal_service: lambda
+    policies:
+      - default_role_policy
+    additional_policies:
+      - action: 's3:GetObject'
+        resource: 'arn:aws:s3:::smoketurner-test-iam-bucket/*'
+    managed_policy_arns:
+      - AWSLambdaBasicExecutionRole
+
+- name: PingLambdaRole
+  settings:
+    principal_service: lambda
+    managed_policy_arns:
+      - AWSLambdaBasicExecutionRole

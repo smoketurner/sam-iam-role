@@ -6,6 +6,7 @@ import os
 import sys
 
 from parliament import analyze_policy_string
+from parliament.misc import make_list
 from parliament.finding import Finding
 
 from .logger import configure_logger
@@ -36,14 +37,14 @@ class Role:
         """
         Return any service principals from the role
         """
-        principal = self.role_dict.get("settings", {}).get("principal_service", [])
+        principal = make_list(
+            self.role_dict.get("settings", {}).get("principal_service", [])
+        )
         if not principal:
             return []
-        if not isinstance(principal, list):
-            principal = [principal]
         return principal
 
-    def _update_statements(self, statements: list, cf_sub_func=False) -> list:
+    def _update_statements(self, statements: list, is_cf=False) -> list:
         """
         Replace partition, region and account ID placeholders in resources
         with specific values.
@@ -54,14 +55,12 @@ class Role:
 
         updated = []
         for statement in statements:
-            resources = statement.get("Resource", [])
-            if not isinstance(resources, list):
-                resources = [resources]
+            resources = make_list(statement.get("Resource", []))
 
             statement["Resource"] = []
 
             for resource in resources:
-                if cf_sub_func:
+                if is_cf:
                     if "AWS::" in resource:
                         resource = {"Fn::Sub": resource}
                 else:
@@ -75,7 +74,7 @@ class Role:
 
         return updated
 
-    def get_default_policies(self, cf_sub_func=False) -> list:
+    def get_default_policies(self, is_cf=False) -> list:
         """
         Return the list of default policies for the role
 
@@ -90,7 +89,7 @@ class Role:
 
                 statements = policy_data.get("PolicyDocument", {}).get("Statement", [])
                 policy_data["PolicyDocument"]["Statement"] = self._update_statements(
-                    statements, cf_sub_func=cf_sub_func
+                    statements, is_cf=is_cf
                 )
 
                 policies.append(policy_data)
@@ -99,22 +98,13 @@ class Role:
 
         return policies
 
-    def get_policies(self, cf_sub_func=False) -> list:
+    def get_inline_policy(self, is_cf=False) -> dict:
         """
-        Assemble all of the policies defined in the role
-
-        Returns a list of policy dictionaries
+        Returns all of the inline statements as an inline policy
         """
         settings = self.role_dict.get("settings")
         if not settings:
-            return []
-
-        principal_service = self.principal_service
-
-        policies = []
-        for policy_name in settings.get("policies", []):
-            if policy_name == DEFAULT_POLICY_NAME:
-                policies.extend(self.get_default_policies(cf_sub_func=cf_sub_func))
+            return {}
 
         statements = []
         for policy in settings.get("additional_policies", []):
@@ -127,17 +117,40 @@ class Role:
                 statement["Resource"] = policy["resource"]
             statements.append(statement)
 
-        if statements:
-            policy_doc = {
-                "PolicyName": "inline_policy",
-                "PolicyDocument": {
-                    "Version": "2012-10-17",
-                    "Statement": self._update_statements(
-                        statements, cf_sub_func=cf_sub_func
-                    ),
-                },
-            }
-            policies.append(policy_doc)
+        if not statements:
+            return {}
+
+        policy_doc = {
+            "PolicyName": "inline_policy",
+            "PolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": self._update_statements(statements, is_cf=is_cf),
+            },
+        }
+
+        return policy_doc
+
+    def get_policies(self, return_policy_docs=False, is_cf=False) -> list:
+        """
+        Assemble all of the policies defined in the role
+
+        Returns a list of policy dictionaries
+        """
+        settings = self.role_dict.get("settings")
+        if not settings:
+            return []
+
+        policies = []
+        for policy_name in settings.get("policies", []):
+            if policy_name == DEFAULT_POLICY_NAME:
+                policies.extend(self.get_default_policies(is_cf=is_cf))
+
+        inline_policy = self.get_inline_policy(is_cf=is_cf)
+        if inline_policy:
+            policies.append(inline_policy)
+
+        if return_policy_docs:
+            return [policy.get("PolicyDocument", {}) for policy in policies]
 
         return policies
 
@@ -173,13 +186,11 @@ class Role:
         """
         findings = self.analyze_managed_policies()
 
-        policies = self.get_policies()
+        policies = self.get_policies(return_policy_docs=True)
         if not policies:
             return findings
 
-        policy_docs = [
-            json.dumps(policy.get("PolicyDocument", {})) for policy in policies
-        ]
+        policy_docs = [json.dumps(policy) for policy in policies]
 
         custom_path = os.path.dirname(os.path.realpath(__file__)) + "/private_auditors"
 
@@ -193,3 +204,60 @@ class Role:
             findings.extend(analyzed_policy.findings)
 
         return findings
+
+    def to_cf_json(self, whitespace=False) -> str:
+        assume_statement = {
+            "Effect": "Allow",
+            "Action": "sts:AssumeRole",
+            "Principal": {},
+        }
+
+        settings = self.role_dict["settings"]
+
+        principal_service = settings.get("principal_service", [])
+        if not isinstance(principal_service, list):
+            principal_service = [principal_service]
+
+        if principal_service:
+            assume_statement["Principal"]["Service"] = [
+                principal + ".amazonaws.com" for principal in principal_service
+            ]
+
+        if "principal_aws" in settings:
+            assume_statement["Principal"]["AWS"] = settings["principal_aws"]
+        if "principal_canonical_user" in settings:
+            assume_statement["Principal"]["CanonicalUser"] = settings[
+                "principal_canonical_user"
+            ]
+        if "principal_federated" in settings:
+            assume_statement["Principal"]["Federated"] = settings["principal_federated"]
+
+        role = {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [assume_statement],
+                },
+                "Description": {
+                    "Fn::Sub": "DO NOT DELETE - Created by Role Creation Service. Created by CloudFormation ${AWS::StackId}"
+                },
+                "Path": "/rcs/",
+                "RoleName": self.role_dict["name"],
+            },
+        }
+
+        if self.policies:
+            role["Properties"]["Policies"] = self.policies
+        if self.managed_policy_arns:
+            role["Properties"]["ManagedPolicyArns"] = [
+                {"Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/" + policy}
+                for policy in self.managed_policy_arns
+            ]
+
+        if whitespace:
+            params = {"indent": 2, "sort_keys": True, "separators": (", ", ": ")}
+        else:
+            params = {"indent": None, "sort_keys": True, "separators": (",", ":")}
+
+        return json.dumps(role, **params)

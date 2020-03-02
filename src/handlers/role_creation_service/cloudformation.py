@@ -8,10 +8,10 @@ import random
 from botocore.config import Config
 from botocore.exceptions import WaiterError, ClientError
 
-from .errors import InvalidTemplateError
+from ..logger import configure_logger
+from ..errors import InvalidTemplateError
 
-LOGGER = logging.getLogger(__name__)
-LOGGER.setLevel(logging.INFO)
+LOGGER = configure_logger(__name__)
 CFN_CONFIG = Config(retries=dict(max_attempts=10))
 STACK_TERMINATION_PROTECTION = os.environ.get("TERMINATION_PROTECTION", False)
 

@@ -5,8 +5,9 @@ import os
 import yaml
 import yamale
 
-from evaluate_policy.role import Role
-from evaluate_policy.logger import configure_logger
+from role_creation_service.role import Role
+from role_creation_service.logger import configure_logger
+from role_creation_service.simulate import simulate_role
 
 
 LOGGER = configure_logger(__name__)
@@ -40,7 +41,7 @@ def validate_yaml(input: str) -> list:
 
     if not isinstance(raw_data, list):
         LOGGER.error("Request data is not a list")
-        return False
+        return None
 
     return raw_data
 
@@ -65,6 +66,9 @@ def lambda_handler(event, context=None):
         role = Role(role_dict, region, account_id)
 
         findings = role.analyze_policies()
+
+        simulate_role(account_id, role)
+
         all_findings.extend(findings)
 
     if all_findings:

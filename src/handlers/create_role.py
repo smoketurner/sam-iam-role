@@ -1,30 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import logging
 import os
 
 import boto3
 
-from create_role.cloudformation import CloudFormation
+from role_creation_service.cloudformation import CloudFormation
+from role_creation_service.logger import configure_logger
+from role_creation_service.sts import STS
 
-EXECUTION_ROLE_NAME = os.environ["EXECUTION_ROLE_NAME"]
+EXECUTION_ROLE_NAME = os.environ.get("EXECUTION_ROLE_NAME")
 
-LOGGER = logging.getLogger(__name__)
-LOGGER.setLevel(logging.INFO)
+LOGGER = configure_logger(__name__)
 
-
-def assume_cross_account_role(account_id, session_name):
-    role_arn = f"arn:aws:iam::{account_id}:role/{EXECUTION_ROLE_NAME}"
-
-    client = boto3.client("sts")
-    response = client.assume_role(RoleArn=role_arn, RoleSessionName=session_name)
-    LOGGER.debug(f"Role '{EXECUTION_ROLE_NAME}' has bee assumed for {account_id}")
-    return boto3.Session(
-        aws_access_key_id=response["Credentials"]["AccessKeyId"],
-        aws_secret_access_key=response["Credentials"]["SecretAccessKey"],
-        aws_session_token=response["Credentials"]["SessionToken"],
-    )
+sts = STS()
 
 
 def lambda_handler(event, _):
@@ -46,7 +35,8 @@ def lambda_handler(event, _):
     if not template_body:
         raise Exception("TemplateBody not found in request")
 
-    role = assume_cross_account_role(account_id, "rcs-role-create")
+    role_arn = f"arn:aws:iam::{account_id}:role/{EXECUTION_ROLE_NAME}"
+    role = sts.assume_cross_account_role(role_arn, "rcs-role-create")
 
     cloudformation = CloudFormation(
         region,

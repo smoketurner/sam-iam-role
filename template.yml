@@ -26,13 +26,14 @@ Parameters:
 
 Globals:
   Function:
-    Handler: handler.lambda_handler
     Runtime: python3.8
+    CodeUri: src/handlers/
     MemorySize: 128 # megabytes
     Timeout: 3 # seconds
     Environment:
       Variables:
         EXECUTION_ROLE_NAME: !Ref ExecutionRoleName
+        RCS_LOG_LEVEL: DEBUG
 
 Resources:
   RoleCreationAdminRole:
@@ -61,21 +62,21 @@ Resources:
   CreateRoleLambdaFunction:
     Type: 'AWS::Serverless::Function'
     Properties:
-      CodeUri: src/handlers/create_role/
+      Handler: create_role.lambda_handler
       Description: Create new IAM role Lambda handler
       Role: !GetAtt RoleCreationAdminRole.Arn
 
   EvaluatePolicyLambdaFunction:
     Type: 'AWS::Serverless::Function'
     Properties:
-      CodeUri: src/handlers/evaluate_policy/
+      Handler: evaluate_policy.lambda_handler
       Description: Evaluate IAM policy Lambda handler
       Role: !GetAtt RoleCreationAdminRole.Arn
 
   VerifyRoleLambdaFunction:
     Type: 'AWS::Serverless::Function'
     Properties:
-      CodeUri: src/handlers/verify_role/
+      Handler: verify_role.lambda_handler
       Description: Verify IAM role Lambda handler
       Role: !GetAtt RoleCreationAdminRole.Arn
 
@@ -86,22 +87,23 @@ Resources:
         Version: '2012-10-17'
         Statement:
           - Principal:
-              Service:
-                - 'events.amazonaws.com'
-                - 'lambda.amazonaws.com'
-                - 'states.amazonaws.com'
+              Service: !Sub states.${AWS::Region}.amazonaws.com
             Effect: Allow
             Action: 'sts:AssumeRole'
       Policies:
-        - PolicyName: 'StatesExecutionPolicy'
+        - PolicyName: StatesExecutionPolicy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
-                Action:
-                  - 'lambda:InvokeFunction'
-                  - 'states:StartExecution'
+                Action: 'states:StartExecution'
                 Resource: '*'
+              - Effect: Allow
+                Action: 'lambda:InvokeFunction'
+                Resource:
+                  - !GetAtt [CreateRoleLambdaFunction, Arn]
+                  - !GetAtt [EvaluatePolicyLambdaFunction, Arn]
+                  - !GetAtt [VerifyRoleLambdaFunction, Arn]
 
   StateMachine:
     Type: 'AWS::StepFunctions::StateMachine'

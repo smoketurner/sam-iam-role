@@ -3,5 +3,6 @@
 __pycache__
 *.pyc
 coverage
+scripts/event.json
 packaged.yml
 samconfig.toml
