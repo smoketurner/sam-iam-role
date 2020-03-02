@@ -183,6 +183,8 @@ class Role:
     def analyze_policies(self, include_community_auditors=False) -> list:
         """
         Analyze the policies on the role
+
+        Return list of Policy objects
         """
         findings = self.analyze_managed_policies()
 
@@ -190,22 +192,24 @@ class Role:
         if not policies:
             return findings
 
-        policy_docs = [json.dumps(policy) for policy in policies]
-
         custom_path = os.path.dirname(os.path.realpath(__file__)) + "/private_auditors"
 
-        for policy_doc in policy_docs:
+        analyzed_polices = []
+        for policy in policies:
             analyzed_policy = analyze_policy_string(
-                policy_doc,
+                json.dumps(policy),
                 ignore_private_auditors=True,
                 private_auditors_custom_path=custom_path,
                 include_community_auditors=include_community_auditors,
             )
-            findings.extend(analyzed_policy.findings)
+            analyzed_polices.append(analyzed_policy)
 
-        return findings
+        return analyzed_polices
 
     def to_cf_json(self, whitespace=False) -> str:
+        """
+        Return the role as a CloudFormation JSON template
+        """
         assume_statement = {
             "Effect": "Allow",
             "Action": "sts:AssumeRole",
@@ -214,9 +218,7 @@ class Role:
 
         settings = self.role_dict["settings"]
 
-        principal_service = settings.get("principal_service", [])
-        if not isinstance(principal_service, list):
-            principal_service = [principal_service]
+        principal_service = self.principal_service
 
         if principal_service:
             assume_statement["Principal"]["Service"] = [
@@ -247,12 +249,15 @@ class Role:
             },
         }
 
-        if self.policies:
-            role["Properties"]["Policies"] = self.policies
-        if self.managed_policy_arns:
+        policies = self.get_policies(is_cf=True)
+        if policies:
+            role["Properties"]["Policies"] = policies
+
+        managed_policy_arns = settings.get("managed_policy_arns", [])
+        if managed_policy_arns:
             role["Properties"]["ManagedPolicyArns"] = [
                 {"Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/" + policy}
-                for policy in self.managed_policy_arns
+                for policy in managed_policy_arns
             ]
 
         if whitespace:
@@ -261,3 +266,6 @@ class Role:
             params = {"indent": None, "sort_keys": True, "separators": (",", ":")}
 
         return json.dumps(role, **params)
+
+    def __str__(self):
+        return self.to_cf_json(whitespace=True)

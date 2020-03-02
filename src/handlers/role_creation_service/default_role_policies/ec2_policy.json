@@ -16,7 +16,7 @@
           "logs:CreateLogStream",
           "logs:PutLogEvents"
         ],
-        "Resource": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/ecs/*:log-stream:*"
+        "Resource": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/ecs/*"
       },
       {
         "Sid": "KMS",

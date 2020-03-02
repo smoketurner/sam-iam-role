@@ -28,8 +28,8 @@ Globals:
   Function:
     Runtime: python3.8
     CodeUri: src/handlers/
-    MemorySize: 128 # megabytes
-    Timeout: 3 # seconds
+    MemorySize: 1024 # megabytes
+    Timeout: 5 # seconds
     Environment:
       Variables:
         EXECUTION_ROLE_NAME: !Ref ExecutionRoleName
@@ -101,9 +101,9 @@ Resources:
               - Effect: Allow
                 Action: 'lambda:InvokeFunction'
                 Resource:
-                  - !GetAtt [CreateRoleLambdaFunction, Arn]
-                  - !GetAtt [EvaluatePolicyLambdaFunction, Arn]
-                  - !GetAtt [VerifyRoleLambdaFunction, Arn]
+                  - !GetAtt 'CreateRoleLambdaFunction.Arn'
+                  - !GetAtt 'EvaluatePolicyLambdaFunction.Arn'
+                  - !GetAtt 'VerifyRoleLambdaFunction.Arn'
 
   StateMachine:
     Type: 'AWS::StepFunctions::StateMachine'
@@ -156,6 +156,11 @@ Resources:
                   "Variable": "$.result",
                   "StringEquals": "COMPLIANT",
                   "Next": "CreateRoles"
+                },
+                {
+                  "Variable": "$.result",
+                  "StringEquals": "UNSUPPORTED",
+                  "Next": "UnsupportedType"
                 }
               ],
               "Default": "NonCompliant"
@@ -181,6 +186,9 @@ Resources:
               "Next": "RolesCreated"
             },
             "NonCompliant": {
+              "Type": "Fail"
+            },
+            "UnsupportedType": {
               "Type": "Fail"
             },
             "RolesCreated": {

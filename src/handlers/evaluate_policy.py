@@ -7,7 +7,7 @@ import yamale
 
 from role_creation_service.role import Role
 from role_creation_service.logger import configure_logger
-from role_creation_service.simulate import simulate_role
+from role_creation_service.simulate import simulate_policies
 
 
 LOGGER = configure_logger(__name__)
@@ -51,7 +51,11 @@ def lambda_handler(event, context=None):
 
     if not event:
         LOGGER.error("No event found in request")
-        return {"result": "NON_COMPLIANT"}
+        return {"result": "UNSUPPORTED"}
+
+    role_type = event.get("type")
+    if role_type != "iam":
+        return {"result": "UNSUPPORTED"}
 
     account_id = event.get("account_id")
     region = event.get("region")
@@ -65,11 +69,13 @@ def lambda_handler(event, context=None):
     for role_dict in roles:
         role = Role(role_dict, region, account_id)
 
-        findings = role.analyze_policies()
+        analyzed_polices = role.analyze_policies()
 
-        simulate_role(account_id, role)
+        for analyzed_policy in analyzed_polices:
+            all_findings.extend(analyzed_policy.findings)
 
-        all_findings.extend(findings)
+        if not all_findings:
+            simulate_policies(account_id, analyzed_polices)
 
     if all_findings:
         for finding in all_findings:
