@@ -16,6 +16,8 @@ LOGGER = configure_logger(__name__)
 
 sts = STS()
 
+DENY_RESULT = ("implicitDeny", "explicitDeny")
+
 
 def simulate_statement(client, account_id: str, statement: object) -> list:
     """
@@ -44,40 +46,88 @@ def simulate_statement(client, account_id: str, statement: object) -> list:
         ResourceOwner=f"arn:aws:iam::{account_id}:root",
     )
 
-    print(f"response = {response}")
+    LOGGER.info(f"SimulateResponse = {response}")
 
     findings = []
 
-    results = response["EvaluationResults"][0]
-    is_org_allowed = results.get("OrganizationDecisionDetail", {}).get(
-        "AllowedByOrganizations"
-    )
-    if is_org_allowed is False:
-        findings.append(Finding("DENIED_POLICY",))
+    for result in response.get("EvaluationResults", []):
 
-    is_boundary_allowed = results.get("PermissionsBoundaryDecisionDetail", {}).get(
-        "AllowedByPermissionsBoundary"
-    )
-    print(f"is_org_allowed={is_org_allowed}, is_boundary_allowed={is_boundary_allowed}")
-    return True
+        is_org_allowed = result.get("OrganizationDecisionDetail", {}).get(
+            "AllowedByOrganizations"
+        )
+        is_boundary_allowed = result.get("PermissionsBoundaryDecisionDetail", {}).get(
+            "AllowedByPermissionsBoundary"
+        )
+
+        action = result.get("EvalActionName")
+        is_action_denied = result.get("EvalDecision", "implicitDeny") in DENY_RESULT
+        if is_action_denied:
+            if is_org_allowed is False:
+                findings.append(
+                    Finding(
+                        "DENIED_POLICY",
+                        detail=f"API {action} was denied by an organizational policy",
+                        location={"Action": action},
+                    )
+                )
+            elif is_boundary_allowed is False:
+                findings.append(
+                    Finding(
+                        "DENIED_POLICY",
+                        detail=f"API {action} was denied by a permission boundary policy",
+                        location={"Action": action},
+                    )
+                )
+            else:
+                findings.append(
+                    Finding(
+                        "DENIED_POLICY",
+                        detail=f"API {action} was denied because it is not in the approved API list",
+                        location={"Action": action},
+                    )
+                )
+            continue
+
+        denied_resources = [
+            resource
+            for resource in result.get("ResourceSpecificResults", [])
+            if resource.get("EvalResourceDecision", "implicitDeny") in DENY_RESULT
+        ]
+
+        if denied_resources:
+            resource_names = [
+                resource.get("EvalResourceName") for resource in denied_resources
+            ]
+
+            findings.append(
+                Finding(
+                    "DENIED_POLICY",
+                    detail=f"API {action} was denied because the API is approved but not for the following resources requested:",
+                    location={"Resource": resource_names},
+                )
+            )
+
+    return findings
 
 
-def simulate_policies(account_id: str, polices: list) -> bool:
+def simulate_policies(account_id: str, polices: list) -> list:
     """
     Simulate an IAM policy in a target account
     """
 
     if not account_id:
-        return False
+        return []
     if not polices:
-        return False
+        return []
 
     role_arn = f"arn:aws:iam::{account_id}:role/{EXECUTION_ROLE_NAME}"
     sts_role = sts.assume_cross_account_role(role_arn, "rcs-simulate-policy")
 
+    all_findings = []
     client = sts_role.client("iam")
     for policy in polices:
         for statement in policy.statements:
-            simulate_statement(client, account_id, statement)
+            findings = simulate_statement(client, account_id, statement)
+            all_findings.extend(findings)
 
-    return True
+    return all_findings

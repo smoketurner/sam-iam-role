@@ -71,11 +71,15 @@ def lambda_handler(event, context=None):
 
         analyzed_polices = role.analyze_policies()
 
+        role_findings = []
         for analyzed_policy in analyzed_polices:
-            all_findings.extend(analyzed_policy.findings)
+            role_findings.extend(analyzed_policy.findings)
 
-        if not all_findings:
-            simulate_policies(account_id, analyzed_polices)
+        if not role_findings:
+            findings = simulate_policies(account_id, analyzed_polices)
+            role_findings.extend(findings)
+
+        all_findings.extend(role_findings)
 
     if all_findings:
         for finding in all_findings:
