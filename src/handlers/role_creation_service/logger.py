@@ -4,11 +4,15 @@
 import logging
 import os
 
+import boto3
+
 
 def configure_logger(logger_name):
     """
     Configures a generic logger
     """
+
+    logging.getLogger("boto").setLevel(logging.INFO)
 
     # Create logger and define INFO as the log level
     logger = logging.getLogger(logger_name)

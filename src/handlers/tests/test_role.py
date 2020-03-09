@@ -136,7 +136,7 @@ class TestRole(unittest.TestCase):
                             "Effect": "Allow",
                             "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
                             "Resource": [
-                                "arn:aws:logs:us-east-1:111222333:log-group:/aws/lambda/*:log-stream:*"
+                                "arn:aws:logs:us-east-1:111222333:log-group:/aws/lambda/*"
                             ],
                         },
                         {
@@ -246,7 +246,10 @@ class TestRole(unittest.TestCase):
         }
         role = Role(data)
 
-        actual = [str(finding) for finding in role.analyze_policies()]
+        actual = []
+        for analyzed_policy in role.analyze_policies():
+            for finding in analyzed_policy.findings:
+                actual.append(str(finding))
 
         expected = [
             "RESOURCE_MISMATCH"

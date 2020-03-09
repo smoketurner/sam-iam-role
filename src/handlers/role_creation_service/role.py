@@ -37,12 +37,10 @@ class Role:
         """
         Return any service principals from the role
         """
-        principal = make_list(
-            self.role_dict.get("settings", {}).get("principal_service", [])
-        )
+        principal = self.role_dict.get("settings", {}).get("principal_service")
         if not principal:
             return []
-        return principal
+        return make_list(principal)
 
     def _update_statements(self, statements: list, is_cf=False) -> list:
         """
@@ -55,7 +53,10 @@ class Role:
 
         updated = []
         for statement in statements:
-            resources = make_list(statement.get("Resource", []))
+            resources = statement.get("Resource")
+            if not resources:
+                resources = "*"
+            resources = make_list(resources)
 
             statement["Resource"] = []
 
@@ -206,7 +207,7 @@ class Role:
 
         return analyzed_polices
 
-    def to_cf_json(self, whitespace=False) -> str:
+    def to_cf_json(self) -> dict:
         """
         Return the role as a CloudFormation JSON template
         """
@@ -259,13 +260,8 @@ class Role:
                 {"Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/" + policy}
                 for policy in managed_policy_arns
             ]
-
-        if whitespace:
-            params = {"indent": 2, "sort_keys": True, "separators": (", ", ": ")}
-        else:
-            params = {"indent": None, "sort_keys": True, "separators": (",", ":")}
-
-        return json.dumps(role, **params)
+        return {self.role_dict["name"]: role}
 
     def __str__(self):
-        return self.to_cf_json(whitespace=True)
+        params = {"indent": 2, "sort_keys": True, "separators": (", ", ": ")}
+        return json.dumps(self.to_cf_json(), **params)

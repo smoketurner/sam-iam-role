@@ -12,14 +12,14 @@ class HandlerTest(unittest.TestCase):
 
     def test_empty_event(self):
         actual = lambda_handler("")
-        expected = {"result": "NON_COMPLIANT"}
+        expected = {"result": "UNSUPPORTED"}
         self.assertEqual(actual, expected)
 
     def test_no_roles(self):
         event = {"roles": ""}
 
         actual = lambda_handler(event)
-        expected = {"result": "NON_COMPLIANT"}
+        expected = {"result": "UNSUPPORTED"}
 
         self.assertEqual(actual, expected)
 
@@ -27,7 +27,7 @@ class HandlerTest(unittest.TestCase):
         event = {"roles": "{test"}
 
         actual = lambda_handler(event)
-        expected = {"result": "NON_COMPLIANT"}
+        expected = {"result": "UNSUPPORTED"}
 
         self.assertEqual(actual, expected)
 
@@ -49,7 +49,7 @@ class HandlerTest(unittest.TestCase):
         }
 
         actual = lambda_handler(event)
-        expected = {"result": "COMPLIANT"}
+        expected = {"result": "UNSUPPORTED"}
 
         self.assertEqual(actual, expected)
 
@@ -65,6 +65,6 @@ class HandlerTest(unittest.TestCase):
         }
 
         actual = lambda_handler(event)
-        expected = {"result": "NON_COMPLIANT"}
+        expected = {"result": "UNSUPPORTED"}
 
         self.assertEqual(actual, expected)

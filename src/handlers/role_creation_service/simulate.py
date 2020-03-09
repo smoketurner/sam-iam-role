@@ -52,6 +52,8 @@ def simulate_statement(client, account_id: str, statement: object) -> list:
 
     for result in response.get("EvaluationResults", []):
 
+        action = result.get("EvalActionName")
+        is_action_denied = result.get("EvalDecision", "implicitDeny") in DENY_RESULT
         is_org_allowed = result.get("OrganizationDecisionDetail", {}).get(
             "AllowedByOrganizations"
         )
@@ -59,9 +61,26 @@ def simulate_statement(client, account_id: str, statement: object) -> list:
             "AllowedByPermissionsBoundary"
         )
 
-        action = result.get("EvalActionName")
-        is_action_denied = result.get("EvalDecision", "implicitDeny") in DENY_RESULT
-        if is_action_denied:
+        denied_resources = [
+            resource
+            for resource in result.get("ResourceSpecificResults", [])
+            if resource.get("EvalResourceDecision", "implicitDeny") in DENY_RESULT
+        ]
+
+        if denied_resources:
+            resource_names = [
+                resource.get("EvalResourceName") for resource in denied_resources
+            ]
+
+            findings.append(
+                Finding(
+                    "DENIED_POLICY",
+                    detail=f"API {action} was denied because the API is approved but not for the following resources requested:",
+                    location={"Resource": resource_names},
+                )
+            )
+
+        elif is_action_denied:
             if is_org_allowed is False:
                 findings.append(
                     Finding(
@@ -88,6 +107,43 @@ def simulate_statement(client, account_id: str, statement: object) -> list:
                 )
             continue
 
+    return findings
+
+
+def simulate_policy(client, account_id: str, policy: object) -> list:
+    """
+    Simulate a policy using the SimulateCustomPolicy API
+    """
+
+    actions = policy.get_allowed_actions()
+
+    resources = ["*"]
+
+    policies = [json.dumps(policy.policy_json)]
+
+    response = client.simulate_custom_policy(
+        PolicyInputList=policies,
+        ActionNames=actions,
+        ResourceArns=resources,
+        ResourceOwner=f"arn:aws:iam::{account_id}:root",
+    )
+
+    LOGGER.info(f"SimulateResponse = {response}")
+
+    findings = []
+
+    for result in response.get("EvaluationResults", []):
+
+        is_org_allowed = result.get("OrganizationDecisionDetail", {}).get(
+            "AllowedByOrganizations"
+        )
+        is_boundary_allowed = result.get("PermissionsBoundaryDecisionDetail", {}).get(
+            "AllowedByPermissionsBoundary"
+        )
+
+        action = result.get("EvalActionName")
+        is_action_denied = result.get("EvalDecision", "implicitDeny") in DENY_RESULT
+
         denied_resources = [
             resource
             for resource in result.get("ResourceSpecificResults", [])
@@ -106,6 +162,32 @@ def simulate_statement(client, account_id: str, statement: object) -> list:
                     location={"Resource": resource_names},
                 )
             )
+        elif is_action_denied:
+            if is_org_allowed is False:
+                findings.append(
+                    Finding(
+                        "DENIED_POLICY",
+                        detail=f"API {action} was denied by an organizational policy",
+                        location={"Action": action},
+                    )
+                )
+            elif is_boundary_allowed is False:
+                findings.append(
+                    Finding(
+                        "DENIED_POLICY",
+                        detail=f"API {action} was denied by a permission boundary policy",
+                        location={"Action": action},
+                    )
+                )
+            else:
+                findings.append(
+                    Finding(
+                        "DENIED_POLICY",
+                        detail=f"API {action} was denied because it is not in the approved API list",
+                        location={"Action": action},
+                    )
+                )
+            continue
 
     return findings
 
@@ -126,8 +208,10 @@ def simulate_policies(account_id: str, polices: list) -> list:
     all_findings = []
     client = sts_role.client("iam")
     for policy in polices:
-        for statement in policy.statements:
-            findings = simulate_statement(client, account_id, statement)
-            all_findings.extend(findings)
+        findings = simulate_policy(client, account_id, policy)
+        all_findings.extend(findings)
+        # for statement in policy.statements:
+        #    findings = simulate_statement(client, account_id, statement)
+        #    all_findings.extend(findings)
 
     return all_findings

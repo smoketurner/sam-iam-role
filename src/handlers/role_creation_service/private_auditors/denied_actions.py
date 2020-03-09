@@ -1,11 +1,15 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-DENIED_ACTIONS = [
+DENIED_ACTIONS = {
     "cloudtrail:CreateTrail",
     "cloudtrail:DeleteTrail",
     "cloudtrail:UpdateTrail",
     "cloudtrail:StopLogging",
+    "config:DeleteConfigRule",
+    "config:DeleteConfigurationRecorder",
+    "config:DeleteDeliveryChannel",
+    "config:StopConfigurationRecorder",
     "ec2:AttachInternetGateway",
     "ec2:AttachVpnGateway",
     "ec2:CreateEgressOnlyInternetGateway",
@@ -21,7 +25,7 @@ DENIED_ACTIONS = [
     "ec2:DetachInternetGateway",
     "ec2:DetachVpnGateway",
     "ec2:DisableEbsEncryptionByDefault",
-]
+}
 
 
 def audit(policy):
@@ -36,6 +40,6 @@ def audit(policy):
     if denied_actions_in_policy:
         policy.add_finding(
             "DENIED_ACTIONS",
-            "Actions are not approved for use",
-            location={"actions": denied_actions_in_policy},
+            "APIs are not approved for use:",
+            location={"Action": denied_actions_in_policy},
         )

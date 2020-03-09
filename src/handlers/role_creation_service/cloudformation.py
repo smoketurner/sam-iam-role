@@ -8,8 +8,8 @@ import random
 from botocore.config import Config
 from botocore.exceptions import WaiterError, ClientError
 
-from ..logger import configure_logger
-from ..errors import InvalidTemplateError
+from .logger import configure_logger
+from .errors import InvalidTemplateError
 
 LOGGER = configure_logger(__name__)
 CFN_CONFIG = Config(retries=dict(max_attempts=10))
@@ -93,7 +93,7 @@ class CloudFormation:
             f"{self.account_id} - calling _create_change_set for {self.stack_name}"
         )
 
-        if not self.template_url:
+        if not self.template_body:
             return False
 
         try:
@@ -102,7 +102,7 @@ class CloudFormation:
                 StackName=self.stack_name,
                 TemplateBody=self.template_body,
                 Parameters=self.parameters,
-                Capabilities=["CAPABILITY_NAMED_IAM",],
+                Capabilities=["CAPABILITY_NAMED_IAM"],
                 Tags=[{"Key": "createdBy", "Value": "Role Creation Service"}],
                 ChangeSetName=self.stack_name,
                 ChangeSetType=self._get_change_set_type(),

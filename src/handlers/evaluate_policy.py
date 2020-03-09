@@ -57,6 +57,7 @@ def lambda_handler(event, context=None):
     if role_type != "iam":
         return {"result": "UNSUPPORTED"}
 
+    stack_name = event.get("stack_name")
     account_id = event.get("account_id")
     region = event.get("region")
 
@@ -86,4 +87,11 @@ def lambda_handler(event, context=None):
             LOGGER.error(str(finding))
         return {"result": "NON_COMPLIANT"}
 
-    return {"result": "COMPLIANT"}
+    output = {
+        "result": "COMPLIANT",
+        "roles": roles,
+        "account_id": account_id,
+        "region": region,
+        "stack_name": stack_name,
+    }
+    return output

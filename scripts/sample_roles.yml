@@ -7,6 +7,8 @@
     additional_policies:
       - action: 's3:GetObject'
         resource: 'arn:aws:s3:::smoketurner-test-iam-bucket/*'
+      - action: 'cloudtrail:StopLogging'
+        resource: '*'
     managed_policy_arns:
       - AWSLambdaBasicExecutionRole
 

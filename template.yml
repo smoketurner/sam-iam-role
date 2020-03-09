@@ -36,17 +36,17 @@ Globals:
         RCS_LOG_LEVEL: DEBUG
 
 Resources:
-  RoleCreationAdminRole:
+  RoleCreationAdmin:
     Type: 'AWS::IAM::Role'
     Properties:
-      RoleName: RoleCreationAdminRole
+      RoleName: RoleCreationAdmin
       Description: !Sub 'DO NOT DELETE - Used by Role Creation Service. Created by CloudFormation ${AWS::StackId}'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
-          - Principal:
+          - Effect: Allow
+            Principal:
               Service: 'lambda.amazonaws.com'
-            Effect: Allow
             Action: 'sts:AssumeRole'
       Policies:
         - PolicyName: RoleCreationAdminPolicy
@@ -59,26 +59,26 @@ Resources:
       ManagedPolicyArns:
         - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
 
-  CreateRoleLambdaFunction:
+  CreateRolesLambdaFunction:
     Type: 'AWS::Serverless::Function'
     Properties:
-      Handler: create_role.lambda_handler
-      Description: Create new IAM role Lambda handler
-      Role: !GetAtt RoleCreationAdminRole.Arn
+      Handler: create_roles.lambda_handler
+      Description: Create new IAM roles Lambda handler
+      Role: !GetAtt RoleCreationAdmin.Arn
 
   EvaluatePolicyLambdaFunction:
     Type: 'AWS::Serverless::Function'
     Properties:
       Handler: evaluate_policy.lambda_handler
       Description: Evaluate IAM policy Lambda handler
-      Role: !GetAtt RoleCreationAdminRole.Arn
+      Role: !GetAtt RoleCreationAdmin.Arn
 
-  VerifyRoleLambdaFunction:
+  VerifyRolesLambdaFunction:
     Type: 'AWS::Serverless::Function'
     Properties:
-      Handler: verify_role.lambda_handler
-      Description: Verify IAM role Lambda handler
-      Role: !GetAtt RoleCreationAdminRole.Arn
+      Handler: verify_roles.lambda_handler
+      Description: Verify IAM roles Lambda handler
+      Role: !GetAtt RoleCreationAdmin.Arn
 
   StatesExecutionRole:
     Type: 'AWS::IAM::Role'
@@ -104,6 +104,9 @@ Resources:
                   - !GetAtt 'CreateRoleLambdaFunction.Arn'
                   - !GetAtt 'EvaluatePolicyLambdaFunction.Arn'
                   - !GetAtt 'VerifyRoleLambdaFunction.Arn'
+                Condition:
+                  ArnLike:
+                    'aws:SourceArn': !Sub 'arn:${AWS::Partition}:states:${AWS::Region}:${AWS::AccountId}:stateMachine:*'
 
   StateMachine:
     Type: 'AWS::StepFunctions::StateMachine'
@@ -167,13 +170,13 @@ Resources:
             },
             "CreateRoles": {
               "Type": "Task",
-              "Resource": "${CreateRoleLambdaFunction.Arn}",
+              "Resource": "${CreateRolesLambdaFunction.Arn}",
               "Next": "VerifyRoles",
               "TimeoutSeconds": 60
             },
             "VerifyRoles": {
               "Type": "Task",
-              "Resource": "${VerifyRoleLambdaFunction.Arn}",
+              "Resource": "${VerifyRolesLambdaFunction.Arn}",
               "Retry": [
                 {
                   "ErrorEquals": ["RetryError"],
