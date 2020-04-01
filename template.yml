@@ -1,10 +1,10 @@
-AWSTemplateFormatVersion: '2010-09-09'
-Transform: 'AWS::Serverless-2016-10-31'
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: "AWS::Serverless-2016-10-31"
 Description: >
   AWS SAM project to deploy an IAM role creation service API
 
 Metadata:
-  'AWS::ServerlessRepo::Application':
+  "AWS::ServerlessRepo::Application":
     Name: role-creation-service
     Description: >
       AWS SAM project to deploy an IAM role creation service API
@@ -13,7 +13,17 @@ Metadata:
     SpdxLicenseId: MIT
     LicenseUrl: LICENSE
     ReadmeUrl: README.md
-    Labels: ['organization', 'org', 'apigateway', 'apigw', 'lambda', 'iam', 'account', 'sqs']
+    Labels:
+      [
+        "organization",
+        "org",
+        "apigateway",
+        "apigw",
+        "lambda",
+        "iam",
+        "account",
+        "sqs",
+      ]
     HomePageUrl: https://github.com/smoketurner/sam-iam-role
     SemanticVersion: 1.0.0
     SourceCodeUrl: https://github.com/smoketurner/sam-iam-role
@@ -37,79 +47,79 @@ Globals:
 
 Resources:
   RoleCreationAdmin:
-    Type: 'AWS::IAM::Role'
+    Type: "AWS::IAM::Role"
     Properties:
       RoleName: RoleCreationAdmin
-      Description: !Sub 'DO NOT DELETE - Used by Role Creation Service. Created by CloudFormation ${AWS::StackId}'
+      Description: !Sub "DO NOT DELETE - Used by Role Creation Service. Created by CloudFormation ${AWS::StackId}"
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
-              Service: 'lambda.amazonaws.com'
-            Action: 'sts:AssumeRole'
+              Service: "lambda.amazonaws.com"
+            Action: "sts:AssumeRole"
       Policies:
         - PolicyName: RoleCreationAdminPolicy
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
-                Action: 'sts:AssumeRole'
-                Resource: !Sub 'arn:${AWS::Partition}:iam::*:role/${ExecutionRoleName}'
+                Action: "sts:AssumeRole"
+                Resource: !Sub "arn:${AWS::Partition}:iam::*:role/${ExecutionRoleName}"
       ManagedPolicyArns:
-        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 
   CreateRolesLambdaFunction:
-    Type: 'AWS::Serverless::Function'
+    Type: "AWS::Serverless::Function"
     Properties:
       Handler: create_roles.lambda_handler
       Description: Create new IAM roles Lambda handler
       Role: !GetAtt RoleCreationAdmin.Arn
 
   EvaluatePolicyLambdaFunction:
-    Type: 'AWS::Serverless::Function'
+    Type: "AWS::Serverless::Function"
     Properties:
       Handler: evaluate_policy.lambda_handler
       Description: Evaluate IAM policy Lambda handler
       Role: !GetAtt RoleCreationAdmin.Arn
 
   VerifyRolesLambdaFunction:
-    Type: 'AWS::Serverless::Function'
+    Type: "AWS::Serverless::Function"
     Properties:
       Handler: verify_roles.lambda_handler
       Description: Verify IAM roles Lambda handler
       Role: !GetAtt RoleCreationAdmin.Arn
 
   StatesExecutionRole:
-    Type: 'AWS::IAM::Role'
+    Type: "AWS::IAM::Role"
     Properties:
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
           - Principal:
               Service: !Sub states.${AWS::Region}.amazonaws.com
             Effect: Allow
-            Action: 'sts:AssumeRole'
+            Action: "sts:AssumeRole"
       Policies:
         - PolicyName: StatesExecutionPolicy
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
-                Action: 'states:StartExecution'
-                Resource: '*'
+                Action: "states:StartExecution"
+                Resource: "*"
               - Effect: Allow
-                Action: 'lambda:InvokeFunction'
+                Action: "lambda:InvokeFunction"
                 Resource:
-                  - !GetAtt 'CreateRoleLambdaFunction.Arn'
-                  - !GetAtt 'EvaluatePolicyLambdaFunction.Arn'
-                  - !GetAtt 'VerifyRoleLambdaFunction.Arn'
+                  - !GetAtt "CreateRoleLambdaFunction.Arn"
+                  - !GetAtt "EvaluatePolicyLambdaFunction.Arn"
+                  - !GetAtt "VerifyRoleLambdaFunction.Arn"
                 Condition:
                   ArnLike:
-                    'aws:SourceArn': !Sub 'arn:${AWS::Partition}:states:${AWS::Region}:${AWS::AccountId}:stateMachine:*'
+                    "aws:SourceArn": !Sub "arn:${AWS::Partition}:states:${AWS::Region}:${AWS::AccountId}:stateMachine:*"
 
   StateMachine:
-    Type: 'AWS::StepFunctions::StateMachine'
+    Type: "AWS::StepFunctions::StateMachine"
     Properties:
       DefinitionString: !Sub |-
         {

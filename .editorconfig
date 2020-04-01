@@ -14,7 +14,7 @@ indent_size = 2
 quote_type = double
 
 [*.yml]
-quote_type = single
+quote_type = double
 
 [*.py]
 quote_type = double
