@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 DENIED_ACTIONS = {
+    "access-analyzer:DeleteAnalyzer",
     "cloudtrail:CreateTrail",
     "cloudtrail:DeleteTrail",
     "cloudtrail:UpdateTrail",
@@ -10,13 +11,16 @@ DENIED_ACTIONS = {
     "config:DeleteConfigurationRecorder",
     "config:DeleteDeliveryChannel",
     "config:StopConfigurationRecorder",
+    "ec2:AcceptVpcPeeringConnection",
     "ec2:AttachInternetGateway",
     "ec2:AttachVpnGateway",
+    "ec2:CreateInternetGateway",
     "ec2:CreateEgressOnlyInternetGateway",
     "ec2:CreateNatGateway",
     "ec2:CreateTransitGateway",
     "ec2:CreateVpnConnection",
     "ec2:CreateVpnGateway",
+    "ec2:CreateVpcPeeringConnection",
     "ec2:DeleteEgressOnlyInternetGateway",
     "ec2:DeleteInternetGateway",
     "ec2:DeleteNatGateway",
@@ -25,6 +29,21 @@ DENIED_ACTIONS = {
     "ec2:DetachInternetGateway",
     "ec2:DetachVpnGateway",
     "ec2:DisableEbsEncryptionByDefault",
+    "ec2:ModifyInstanceMetadataOptions",
+    "globalaccelerator:CreateAccelerator",
+    "globalaccelerator:CreateEndpointGroup",
+    "globalaccelerator:CreateListener",
+    "globalaccelerator:UpdateAccelerator",
+    "globalaccelerator:UpdateAcceleratorAttributes",
+    "globalaccelerator:UpdateEndpointGroup",
+    "globalaccelerator:UpdateListener",
+    "guardduty:DeleteDetector",
+    "guardduty:DisassociateFromMasterAccount",
+    "guardduty:UpdateDetector",
+    "guardduty:CreateFilter",
+    "guardduty:CreateIPSet",
+    "organizations:LeaveOrganization",
+    "s3:PutAccountPublicAccessBlock",
 }
 
 

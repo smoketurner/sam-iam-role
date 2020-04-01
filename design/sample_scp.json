@@ -2,9 +2,54 @@
   "Version": "2012-10-17",
   "Statement": [
     {
+      "Sid": "DenyRootUser",
+      "Effect": "Deny",
+      "Action": "*",
+      "Resource": "*",
+      "Condition": {
+        "StringLike": {
+          "aws:PrincipalArn": "arn:aws:iam::*:root"
+        }
+      }
+    },
+    {
+      "Sid": "RequireAllEc2RolesToUseV2",
+      "Effect": "Deny",
+      "Action": "*",
+      "Resource": "*",
+      "Condition": {
+        "NumericLessThan": {
+          "ec2:RoleDelivery": "2.0"
+        }
+      }
+    },
+    {
+      "Sid": "RequireImdsV2",
+      "Effect": "Deny",
+      "Action": "ec2:RunInstances",
+      "Resource": "arn:aws:ec2:*:*:instance/*",
+      "Condition": {
+        "StringNotEquals": {
+          "ec2:MetadataHttpTokens": "required"
+        }
+      }
+    },
+    {
+      "Sid": "MaxImdsHopLimit",
+      "Effect": "Deny",
+      "Action": "ec2:RunInstances",
+      "Resource": "arn:aws:ec2:*:*:instance/*",
+      "Condition": {
+        "NumericGreaterThan": {
+          "ec2:MetadataHttpPutResponseHopLimit": "1"
+        }
+      }
+    },
+    {
       "Sid": "DenyActions",
       "Effect": "Deny",
       "Action": [
+        "access-analyzer:DeleteAnalyzer",
         "cloudtrail:CreateTrail",
         "cloudtrail:DeleteTrail",
         "cloudtrail:UpdateTrail",
@@ -13,13 +58,16 @@
         "config:DeleteConfigurationRecorder",
         "config:DeleteDeliveryChannel",
         "config:StopConfigurationRecorder",
+        "ec2:AcceptVpcPeeringConnection",
         "ec2:AttachInternetGateway",
         "ec2:AttachVpnGateway",
         "ec2:CreateEgressOnlyInternetGateway",
+        "ec2:CreateInternetGateway",
         "ec2:CreateNatGateway",
         "ec2:CreateTransitGateway",
         "ec2:CreateVpnConnection",
         "ec2:CreateVpnGateway",
+        "ec2:CreateVpcPeeringConnection",
         "ec2:DeleteEgressOnlyInternetGateway",
         "ec2:DeleteInternetGateway",
         "ec2:DeleteNatGateway",
@@ -27,7 +75,17 @@
         "ec2:DetachClassicLinkVpc",
         "ec2:DetachInternetGateway",
         "ec2:DetachVpnGateway",
-        "ec2:DisableEbsEncryptionByDefault"
+        "ec2:DisableEbsEncryptionByDefault",
+        "ec2:ModifyInstanceMetadataOptions",
+        "globalaccelerator:Create*",
+        "globalaccelerator:Update*",
+        "guardduty:DeleteDetector",
+        "guardduty:DisassociateFromMasterAccount",
+        "guardduty:UpdateDetector",
+        "guardduty:CreateFilter",
+        "guardduty:CreateIPSet",
+        "organizations:LeaveOrganization",
+        "s3:PutAccountPublicAccessBlock"
       ],
       "Resource": "*"
     },
@@ -57,15 +115,25 @@
       "Sid": "DenyAllOutsideUS",
       "Effect": "Deny",
       "NotAction": [
+        "a4b:*",
+        "budgets:*",
+        "ce:*",
+        "chime:*",
+        "cloudfront:*",
+        "cur:*",
+        "globalaccelerator:*",
+        "health:*",
         "iam:*",
+        "importexport:*",
+        "mobileanalytics:*",
         "organizations:*",
         "route53:*",
-        "budgets:*",
+        "route53domains:*",
+        "shield:*",
+        "support:*",
+        "trustedadvisor:*",
         "waf:*",
-        "cloudfront:*",
-        "globalaccelerator:*",
-        "importexport:*",
-        "support:*"
+        "wellarchitected:*"
       ],
       "Resource": "*",
       "Condition": {
@@ -76,17 +144,6 @@
             "us-west-1",
             "us-west-2"
           ]
-        }
-      }
-    },
-    {
-      "Sid": "DenyIncorrectEncryptionHeader",
-      "Effect": "Deny",
-      "Action": "s3:PutObject",
-      "Resource": "*",
-      "Condition": {
-        "StringNotEquals": {
-          "s3:x-amz-server-side-encryption": "aws:kms"
         }
       }
     },
