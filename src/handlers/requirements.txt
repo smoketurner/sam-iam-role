@@ -1,2 +1,2 @@
-parliament==0.4.9
+parliament==0.4.10
 yamale==2.0.1

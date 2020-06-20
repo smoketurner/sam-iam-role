@@ -1,3 +1,5 @@
+.PHONY: setup build deploy format test invoke list-policies
+
 setup:
 	python3 -m venv .venv
 	.venv/bin/pip3 install -r requirements.txt
