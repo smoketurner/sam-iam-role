@@ -1,0 +1,218 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Base IAM roles for all accounts
+
+Parameters:
+  MasterAccountId:
+    Type: String
+    Description: AWS Master Account ID
+
+Resources:
+  PermissionBoundary:
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      ManagedPolicyName: PermissionBoundary
+      Description: !Sub "DO NOT DELETE - Used by the Role Creation Service. Created by CloudFormation ${AWS::StackId}"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - "logs:CreateLogGroup"
+              - "xray:*"
+            Resource: "*" # does not support resource ARNs
+          - Effect: Allow
+            Action:
+              - "apigateway:*"
+              - "autoscaling:*"
+              - "cloudfront:*"
+              - "cloudwatch:*"
+              - "dynamodb:*"
+              - "ebs:*"
+              - "ec2:*"
+              - "ecr:*"
+              - "ecs:*"
+              - "eks:*"
+              - "elasticache:*"
+              - "elasticloadbalancing:*"
+              - "es:*"
+              - "execute-api:*"
+              - "kms:*"
+              - "lambda:*"
+              - "logs:CreateLogStream"
+              - "logs:PutLogEvents"
+              - "mobiletargeting:*" # Pinpoint
+              - "rds-data:*"
+              - "rds:*"
+              - "rds-db:*"
+              - "route53:*"
+              - "s3:*"
+              - "ses:*"
+              - "secretsmanager:*"
+              - "sns:*"
+              - "sqs:*"
+              - "states:*"
+            Resource:
+              - !Sub "arn:${AWS::Partition}:apigateway:*::/restapis/*"
+              - !Sub "arn:${AWS::Partition}:autoscaling:*:${AWS::AccountId}:autoScalingGroup:*"
+              - !Sub "arn:${AWS::Partition}:autoscaling:*:${AWS::AccountId}:launchConfiguration:*"
+              - !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/*"
+              - !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:origin-access-identity/*"
+              - !Sub "arn:${AWS::Partition}:cloudwatch:*:${AWS::AccountId}:*"
+              - !Sub "arn:${AWS::Partition}:dynamodb:*:${AWS::AccountId}:table/*"
+              - !Sub "arn:${AWS::Partition}:ec2:*::image/*"
+              - !Sub "arn:${AWS::Partition}:ec2:*:${AWS::AccountId}:instance/*"
+              - !Sub "arn:${AWS::Partition}:ec2:*:${AWS::AccountId}:key-pair/*"
+              - !Sub "arn:${AWS::Partition}:ec2:*:${AWS::AccountId}:launch-template/*"
+              - !Sub "arn:${AWS::Partition}:ec2:*:${AWS::AccountId}:network-interface/*"
+              - !Sub "arn:${AWS::Partition}:ec2:*:${AWS::AccountId}:security-group/*"
+              - !Sub "arn:${AWS::Partition}:ec2:*::snapshot/*"
+              - !Sub "arn:${AWS::Partition}:ec2:*::spot-instances-request/*"
+              - !Sub "arn:${AWS::Partition}:ec2:*:${AWS::AccountId}:volume/*"
+              - !Sub "arn:${AWS::Partition}:ecr:*:${AWS::AccountId}:repository/*"
+              - !Sub "arn:${AWS::Partition}:ecs:*:${AWS::AccountId}:cluster/*"
+              - !Sub "arn:${AWS::Partition}:ecs:*:${AWS::AccountId}:container-instance/*"
+              - !Sub "arn:${AWS::Partition}:ecs:*:${AWS::AccountId}:service/*"
+              - !Sub "arn:${AWS::Partition}:ecs:*:${AWS::AccountId}:task/*"
+              - !Sub "arn:${AWS::Partition}:ecs:*:${AWS::AccountId}:task-definition/*"
+              - !Sub "arn:${AWS::Partition}:ecs:*:${AWS::AccountId}:task-set/*"
+              - !Sub "arn:${AWS::Partition}:eks:*:${AWS::AccountId}:cluster/*"
+              - !Sub "arn:${AWS::Partition}:eks:*:${AWS::AccountId}:nodegroup/*"
+              - !Sub "arn:${AWS::Partition}:eks:*:${AWS::AccountId}:fargateprofile/*"
+              - !Sub "arn:${AWS::Partition}:elasticloadbalancing:*:${AWS::AccountId}:listener/*"
+              - !Sub "arn:${AWS::Partition}:elasticloadbalancing:*:${AWS::AccountId}:loadbalancer/*"
+              - !Sub "arn:${AWS::Partition}:elasticloadbalancing:*:${AWS::AccountId}:targetgroup/*"
+              - !Sub "arn:${AWS::Partition}:es:*:${AWS::AccountId}:domain/*"
+              - !Sub "arn:${AWS::Partition}:execute-api:*:${AWS::AccountId}:*"
+              - !Sub "arn:${AWS::Partition}:kms:*:${AWS::AccountId}:key/*"
+              - !Sub "arn:${AWS::Partition}:kms:*:${AWS::AccountId}:alias/*"
+              - !Sub "arn:${AWS::Partition}:lambda:*:${AWS::AccountId}:function:*"
+              - !Sub "arn:${AWS::Partition}:lambda:*:${AWS::AccountId}:layer:*"
+              - !Sub "arn:${AWS::Partition}:lambda:*:${AWS::AccountId}:event-source-mapping:*"
+              - !Sub "arn:${AWS::Partition}:logs:*:${AWS::AccountId}:log-group:*"
+              - !Sub "arn:${AWS::Partition}:mobiletargeting:*:${AWS::AccountId}:apps/*"
+              - !Sub "arn:${AWS::Partition}:mobiletargeting:*:${AWS::AccountId}:templates/*"
+              - !Sub "arn:${AWS::Partition}:rds:*:${AWS::AccountId}:cluster:*"
+              - !Sub "arn:${AWS::Partition}:rds:*:${AWS::AccountId}:db:*"
+              - !Sub "arn:${AWS::Partition}:rds-db:*:${AWS::AccountId}:dbuser:*"
+              - !Sub "arn:${AWS::Partition}:route53:::hostedzone/*"
+              - !Sub "arn:${AWS::Partition}:route53:::healthcheck/*"
+              - !Sub "arn:${AWS::Partition}:ses:*:${AWS::AccountId}:identity/*"
+              - !Sub "arn:${AWS::Partition}:secretsmanager:*:${AWS::AccountId}:secret:*"
+              - !Sub "arn:${AWS::Partition}:sns:*:${AWS::AccountId}:*"
+              - !Sub "arn:${AWS::Partition}:sqs:*:${AWS::AccountId}:*"
+              - !Sub "arn:${AWS::Partition}:states:*:${AWS::AccountId}:*"
+          - Effect: Allow
+            Action:
+              - "cloudformation:ContinueUpdateRollback"
+              - "cloudformation:CreateChangeSet"
+              - "cloudformation:CreateStack"
+              - "cloudformation:CreateStackSet"
+              - "cloudformation:UpdateStack"
+              - "cloudformation:DeleteStack"
+            Resource: !Sub "arn:${AWS::Partition}:cloudformation:*:${AWS::AccountId}:stack/*"
+            Condition:
+              "cloudformation:RoleArn": !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/CloudFormationRole"
+          - Effect: Allow
+            Action:
+              - "cloudformation:DescribeChangeSet"
+              - "cloudformation:DescribeStacks"
+              - "cloudformation:ExecuteChangeSet"
+              - "cloudformation:DeleteChangeSet"
+            Resource: !Sub "arn:${AWS::Partition}:cloudformation:*:${AWS::AccountId}:stack/*"
+
+  CloudFormationPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      ManagedPolicyName: CloudFormationPolicy
+      Description: !Sub "DO NOT DELETE - Used by CloudFormation. Created by CloudFormation ${AWS::StackId}"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - "apigateway:*"
+              - "autoscaling:*"
+              - "cloudfront:*"
+              - "cloudformation:*"
+              - "cloudwatch:*"
+              - "dynamodb:*"
+              - "ebs:*"
+              - "ec2:*"
+              - "ecr:*"
+              - "ecs:*"
+              - "eks:*"
+              - "elasticache:*"
+              - "elasticloadbalancing:*"
+              - "es:*"
+              - "execute-api:*"
+              - "imagebuilder:*"
+              - "kms:*"
+              - "lambda:*"
+              - "logs:*"
+              - "mobiletargeting:*"
+              - "rds:*"
+              - "rds-db:*"
+              - "rds-data:*"
+              - "route53:*"
+              - "s3:*"
+              - "ses:*"
+              - "secretsmanager:*"
+              - "sns:*"
+              - "sqs:*"
+              - "states:*"
+              - "xray:*"
+            Resource: "*"
+
+  RoleCreationExecution:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: RoleCreationExecution
+      Description: !Sub "DO NOT DELETE - Used by the Role Creation Service. Created by CloudFormation ${AWS::StackId}"
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub "arn:${AWS::Partition}:iam::${MasterAccountId}:role/RoleCreationAdmin"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: RoleCreationInlinePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "cloudformation:CreateChangeSet"
+                  - "cloudformation:DescribeChangeSet"
+                  - "cloudformation:DescribeStacks"
+                  - "cloudformation:ExecuteChangeSet"
+                Resource: !Sub "arn:${AWS::Partition}:cloudformation:*:${AWS::AccountId}:stack/*"
+              - Effect: Allow
+                Action:
+                  - "iam:GetContextKeysForCustomPolicy"
+                  - "iam:SimulateCustomPolicy"
+                  - "organizations:Describe*"
+                  - "organizations:List*"
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - "iam:AttachRolePolicy"
+                  - "iam:CreateRole"
+                  - "iam:CreatePolicyVersion"
+                  - "iam:DeleteRole"
+                  - "iam:DeleteRolePermissionsBoundary"
+                  - "iam:DeleteRolePolicy"
+                  - "iam:DetachRolePolicy"
+                  - "iam:GetRole"
+                  - "iam:GetRolePolicy"
+                  - "iam:PutRolePermissionsBoundary"
+                  - "iam:PutRolePolicy"
+                  - "iam:SetDefaultPolicyVersion"
+                  - "iam:UpdateAssumeRolePolicy"
+                  - "iam:UpdateRole"
+                  - "iam:UpdateRoleDescription"
+                Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/rcs/*"
+                Condition:
+                  "ForAnyValue:StringEquals":
+                    "aws:CalledVia":
+                      - "cloudformation.amazonaws.com"

@@ -1,0 +1,27 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Base template for production accounts
+Parameters:
+  NonProductionAccountId:
+    Type: String
+    Description: Non-Production account ID
+    Default: '194184563732'
+
+Resources:
+  DeploymentRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: DeploymentRole
+      Description: !Sub 'DO NOT DELETE - Used by CodePipeline, CodeDeploy and CodeBuild. Created by CloudFormation ${AWS::StackId}'
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS:
+                - !Sub 'arn:${AWS::Partition}:iam::${NonProductionAccountId}:role/CodePipelineRole'
+                - !Sub 'arn:${AWS::Partition}:iam::${NonProductionAccountId}:role/CodeBuildRole'
+                - !Sub 'arn:${AWS::Partition}:iam::${NonProductionAccountId}:role/CodeDeployRole'
+            Action: 'sts:AssumeRole'
+      PermissionsBoundary: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/PermissionBoundary'
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/CloudFormationPolicy'
