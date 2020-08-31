@@ -1,2 +1,2 @@
 parliament==1.2.0
-yamale==2.1.0
+yamale==3.0.4
